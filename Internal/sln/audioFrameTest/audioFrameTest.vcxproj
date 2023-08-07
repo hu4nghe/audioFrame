@@ -80,7 +80,7 @@
     </Link>
   </ItemDefinitionGroup>
   <ItemGroup>
-    <ClCompile Include="audioFrameTest.cpp" />
+    <ClCompile Include="..\..\src\audioFrameTest.cpp" />
     <ClCompile Include="functionsNotInUse.cpp" />
   </ItemGroup>
   <ItemGroup>
