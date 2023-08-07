@@ -15,10 +15,10 @@
     </Filter>
   </ItemGroup>
   <ItemGroup>
-    <ClCompile Include="audioFrameTest.cpp">
+    <ClCompile Include="functionsNotInUse.cpp">
       <Filter>源文件</Filter>
     </ClCompile>
-    <ClCompile Include="functionsNotInUse.cpp">
+    <ClCompile Include="..\..\src\audioFrameTest.cpp">
       <Filter>源文件</Filter>
     </ClCompile>
   </ItemGroup>
