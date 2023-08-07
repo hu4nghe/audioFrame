@@ -1,0 +1,22 @@
+<?xml version="1.0" encoding="utf-8"?>
+<Project ToolsVersion="4.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <ImportGroup Label="PropertySheets" />
+  <PropertyGroup Label="UserMacros" />
+  <PropertyGroup>
+    <OutDir>..\..\lib\</OutDir>
+    <IncludePath>C:\Users\Modulo\Desktop\WorkSpace\Internal\include;C:\Users\Modulo\Desktop\WorkSpace\External\include;$(IncludePath)</IncludePath>
+    <LibraryPath>C:\Users\Modulo\Desktop\WorkSpace\Internal\lib;C:\Users\Modulo\Desktop\WorkSpace\External\lib;$(LibraryPath)</LibraryPath>
+  </PropertyGroup>
+  <ItemDefinitionGroup>
+    <ClCompile>
+      <RuntimeLibrary>MultiThreadedDebug</RuntimeLibrary>
+      <LanguageStandard>stdcpplatest</LanguageStandard>
+      <LanguageStandard_C>stdc17</LanguageStandard_C>
+      <EnableModules>true</EnableModules>
+    </ClCompile>
+    <Link>
+      <AdditionalDependencies>C:\Users\Modulo\Desktop\WorkSpace\External\lib\sndfile.lib;C:\Users\Modulo\Desktop\WorkSpace\External\lib\portaudio_x64.lib;C:\Users\Modulo\Desktop\WorkSpace\External\lib\Processing.NDI.Lib.x64.lib;C:\Users\Modulo\Desktop\WorkSpace\External\lib\samplerate.lib;%(AdditionalDependencies)</AdditionalDependencies>
+    </Link>
+  </ItemDefinitionGroup>
+  <ItemGroup />
+</Project>
