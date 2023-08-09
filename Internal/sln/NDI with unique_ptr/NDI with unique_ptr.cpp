@@ -14,17 +14,9 @@
 #include "Processing.NDI.Lib.h" 
 #include "portaudio.h"
 
-void PAErrorCheck(PaError err)
-{
-	if (err != paNoError)
-	{
-		std::cout << std::format("PortAudio error : {}.", Pa_GetErrorText(err)) << std::endl;
-		exit(EXIT_FAILURE);
-	}
-}
+
 
 constexpr auto SAMPLE_RATE = 44100;
-typedef float SAMPLE;
 
 static std::atomic<bool> exit_loop(false);
 static void sigintHandler(int) { exit_loop = true; }
@@ -34,18 +26,26 @@ std::mutex bufferSizeMtx;
 std::condition_variable bufferCondVar;
 std::condition_variable bufferSizeCondVar;
 
-std::queue<std::unique_ptr<SAMPLE>> audioBufferQueue;
+//Global variables for communications between threads.
+std::queue<std::unique_ptr<float>> audioBufferQueue;
 bool bufferSizeReady = false;
 bool bufferSizeDefined = false;
 int bufferSize = 0;
+
+void PAErrorCheck(PaError err)
+{
+	if (err != paNoError)
+	{
+		std::cout << std::format("PortAudio error : {}.", Pa_GetErrorText(err)) << std::endl;
+		exit(EXIT_FAILURE);
+	}
+}
 
 void NDIAudioTread()
 {
 	std::signal(SIGINT, sigintHandler);
 
-	/**
-	 * @brief Create a NDI finder and try to find a source NDI 
-	 */
+	// Create a NDI finder and try to find a source NDI 
 	const NDIlib_find_create_t NDIFindCreateDesc;
 	auto pNDIFind = NDIlib_find_create_v2(&NDIFindCreateDesc);
 	if (pNDIFind == nullptr)
@@ -66,9 +66,7 @@ void NDIAudioTread()
 		return;
 	}
 
-	/**
-	 * @brief Create a NDI receiver if the NDI source is found.
-	 */
+	//Create a NDI receiver if the NDI source is found.
 	NDIlib_recv_create_v3_t NDIRecvCreateDesc;
 	NDIRecvCreateDesc.source_to_connect_to = *pSources;
 	NDIRecvCreateDesc.p_ndi_recv_name = "Audio Receiver";
@@ -81,12 +79,11 @@ void NDIAudioTread()
 	}
 	NDIlib_find_destroy(pNDIFind);
 
-	/**
-	 * @brief Capture NDI data
-	 */
+	// NDI data capture loop
 	NDIlib_audio_frame_v2_t audioFrame;
 	while (!exit_loop)
 	{
+		// Capture NDI data
 		auto NDI_frame_type = NDIlib_recv_capture_v2(pNDI_recv, nullptr, &audioFrame, nullptr, 1000);
 
 		if (NDI_frame_type == NDIlib_frame_type_audio)
@@ -102,27 +99,28 @@ void NDIAudioTread()
 				bufferSizeCondVar.notify_one();
 			}
 			
-			//Create a NDI audio object and convert it to interleaved float format.
+			// Create a NDI audio object and convert it to interleaved float format.
 			NDIlib_audio_frame_interleaved_32f_t audio_frame_32bpp_interleaved;
 			audio_frame_32bpp_interleaved.p_data = new float[audioFrame.no_samples * audioFrame.no_channels];
 			NDIlib_util_audio_to_interleaved_32f_v2(&audioFrame, &audio_frame_32bpp_interleaved);
 			
-			//Transfer the ownership of audio data to smart pointer and push it into the queue.
+			// Transfer the ownership of audio data to smart pointer and push it into the queue.
 			std::unique_ptr<float> audioData(audio_frame_32bpp_interleaved.p_data);
 			std::lock_guard<std::mutex> lock(bufferMutex);
 			audioBufferQueue.push(std::move(audioData));
 			bufferCondVar.notify_one();
 		}
 	}
+	// NDI clean up
 	NDIlib_recv_destroy(pNDI_recv);
 	NDIlib_destroy();
 }
 
 static int audioCallback(const void* inputBuffer, void* outputBuffer,
-	unsigned long framesPerBuffer,
-	const PaStreamCallbackTimeInfo* timeInfo,
-	PaStreamCallbackFlags statusFlags,
-	void* userData)
+						 unsigned long framesPerBuffer,
+						 const PaStreamCallbackTimeInfo* timeInfo,
+						 PaStreamCallbackFlags statusFlags,
+						 void* userData)
 {
 	auto out = static_cast<float*>(outputBuffer);
 

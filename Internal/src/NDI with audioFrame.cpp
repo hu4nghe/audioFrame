@@ -11,28 +11,24 @@
 #include "portaudio.h"
 #include "audioFrame.h"
 
-typedef float SAMPLE;
-
 static std::atomic<bool> exit_loop(false);
 static void sigint_handler(int) { exit_loop = true; }
 
-std::queue<audioFrame<float>> audioFrameBufferQueue;
-
 std::mutex bufferMutex;
 std::mutex bufferSizeMtx;
-
 std::condition_variable bufferCondVar;
 std::condition_variable bufferSizeCondVar;
 
+//Global variables for communication between threads.
 bool bufferSizeReady = false;
 bool bufferSizeDefined = false;
+std::queue<audioFrame<float>> audioFrameBufferQueue;
 int bufferSize = 0;
 
 void PAErrorCheck(PaError err)
 {
     if (err != paNoError)
     {
-        // Print error info.
         std::cout << std::format("PortAudio error : {}.", Pa_GetErrorText(err)) << std::endl;
         exit(EXIT_FAILURE);
     }
@@ -120,7 +116,7 @@ static int audioCallback(const void* inputBuffer, void* outputBuffer,
     PaStreamCallbackFlags statusFlags,
     void* userData)
 {    
-    auto out = static_cast<SAMPLE*>(outputBuffer);
+    auto out = static_cast<float*>(outputBuffer);
 
     std::unique_lock<std::mutex> lock(bufferMutex);
     bufferCondVar.wait(lock, [] { return !audioFrameBufferQueue.empty(); });
