@@ -14,8 +14,6 @@
 #include "Processing.NDI.Lib.h" 
 #include "portaudio.h"
 
-
-
 constexpr auto SAMPLE_RATE = 44100;
 
 static std::atomic<bool> exit_loop(false);
