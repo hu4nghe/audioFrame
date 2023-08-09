@@ -70,7 +70,7 @@ public:
         
         auto posBegin = audioData.begin() + currentPos;
 
-        int indexEnd = currentPos + framesPerBuffer * 2;
+        size_t indexEnd = currentPos + framesPerBuffer * 2;
         if (indexEnd > audioData.size())
         {
             std::copy(posBegin, audioData.end(), out);
