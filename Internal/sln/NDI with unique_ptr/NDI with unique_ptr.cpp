@@ -1,34 +1,35 @@
-﻿#include <iostream>
+﻿// For error message and debug info output
+#include <iostream>
 #include <format>
 
+// Audio data container
 #include <queue>
 #include <memory>
 
+// Multi-thread operation
 #include <atomic>
 #include <condition_variable>
 #include <mutex>
 #include <thread>
 
+// System signal catch
 #include <csignal>
 
+// Third party libs : NDI and portAudio
 #include "Processing.NDI.Lib.h" 
 #include "portaudio.h"
 
-int callbackCount = 0;
-
-
-
 constexpr auto SAMPLE_RATE = 44100;
 
+// System signal catch handler
 static std::atomic<bool> exit_loop(false);
 static void sigintHandler(int) { exit_loop = true; }
 
-std::mutex bufferMutex;
+//Global variables for multi-thread communication.
+std::mutex audioDataMtx;
 std::mutex bufferSizeMtx;
-std::condition_variable bufferCondVar;
+std::condition_variable audioDataCondVar;
 std::condition_variable bufferSizeCondVar;
-
-//Global variables for communications between threads.
 std::queue<std::unique_ptr<float>> audioBufferQueue;
 bool bufferSizeChanged = false;
 int bufferSize = 0;
@@ -81,9 +82,9 @@ void NDIAudioTread()
 	NDIlib_find_destroy(pNDIFind);
 
 	// NDI data capture loop
-	
+
 	int currentSampleNum = 0;
-	
+
 	NDIlib_audio_frame_v2_t audioFrame;
 	while (!exit_loop)
 	{
@@ -93,10 +94,10 @@ void NDIAudioTread()
 		if (NDI_frame_type == NDIlib_frame_type_audio)
 		{
 			// If the portaudio do not know the buffer size, pass it to portAudio output thread.
-			std::cout << std::format("NDIAudioThread : current sample number is {} and source sample number is {}\n", currentSampleNum, audioFrame.no_samples) << std::endl;
+			//std::cout << std::format("NDIAudioThread : current sample number is {} and source sample number is {}\n", currentSampleNum, audioFrame.no_samples) << std::endl;
 			if (currentSampleNum != audioFrame.no_samples)
 			{
-				std::cout << std::format("NDIAudioThread : Buffer size change mecanism triggered in NDI thread main !\n") << std::endl;
+				//std::cout << std::format("NDIAudioThread : Buffer size change mecanism triggered in NDI thread main !\n") << std::endl;
 				currentSampleNum = audioFrame.no_samples;
 				std::unique_lock<std::mutex> lock(bufferSizeMtx);
 				bufferSize = audioFrame.no_samples;
@@ -104,17 +105,17 @@ void NDIAudioTread()
 				lock.unlock();
 				bufferSizeCondVar.notify_one();
 			}
-			
+
 			// Create a NDI audio object and convert it to interleaved float format.
 			NDIlib_audio_frame_interleaved_32f_t audio_frame_32bpp_interleaved;
 			audio_frame_32bpp_interleaved.p_data = new float[audioFrame.no_samples * audioFrame.no_channels];
 			NDIlib_util_audio_to_interleaved_32f_v2(&audioFrame, &audio_frame_32bpp_interleaved);
-			
+
 			// Transfer the ownership of audio data to smart pointer and push it into the queue.
 			std::unique_ptr<float> audioData(audio_frame_32bpp_interleaved.p_data);
-			std::lock_guard<std::mutex> lock(bufferMutex);
+			std::lock_guard<std::mutex> lock(audioDataMtx);
 			audioBufferQueue.push(std::move(audioData));
-			bufferCondVar.notify_one();
+			audioDataCondVar.notify_one();
 		}
 	}
 	// NDI clean up
@@ -123,17 +124,17 @@ void NDIAudioTread()
 }
 
 static int audioCallback(const void* inputBuffer, void* outputBuffer,
-						 unsigned long framesPerBuffer,
-						 const PaStreamCallbackTimeInfo* timeInfo,
-						 PaStreamCallbackFlags statusFlags,
-						 void* userData)
+	unsigned long framesPerBuffer,
+	const PaStreamCallbackTimeInfo* timeInfo,
+	PaStreamCallbackFlags statusFlags,
+	void* userData)
 {
-	std::cout << std::format("PAThread : Buffer size is {}",framesPerBuffer) << std::endl;
+	//std::cout << std::format("PAThread : Buffer size is {}", framesPerBuffer) << std::endl;
 	auto out = static_cast<float*>(outputBuffer);
 
 	//Wait NDI thread push audio data into the queue
-	std::unique_lock<std::mutex> lock(bufferMutex);
-	bufferCondVar.wait(lock, [] { return !audioBufferQueue.empty(); });
+	std::unique_lock<std::mutex> lock(audioDataMtx);
+	audioDataCondVar.wait(lock, [] { return !audioBufferQueue.empty(); });
 
 	//Get data from the queue.
 	auto audioSamples = std::move(audioBufferQueue.front());
@@ -141,12 +142,11 @@ static int audioCallback(const void* inputBuffer, void* outputBuffer,
 
 	//Copy data to portaudio output stream.
 	std::copy(audioSamples.get(), audioSamples.get() + framesPerBuffer * 2, out);
-	
-	callbackCount++;
-	std::cout << std::format("PAThread : Buffer size is {}, Callback normally called {} times.", framesPerBuffer,callbackCount) << std::endl;
+
+	//std::cout << std::format("PAThread : Buffer size is {}, Callback normally called {} times.", framesPerBuffer, callbackCount) << std::endl;
 
 	return paContinue;
-	
+
 }
 
 void PAThread()
@@ -163,20 +163,20 @@ void PAThread()
 	{
 		if (Pa_IsStreamActive(stream))
 		{
-			std::cout << std::format("PAThread : Buffer size change mecanism triggered in PA thread main") << std::endl;
+			//std::cout << std::format("PAThread : Buffer size change mecanism triggered in PA thread main") << std::endl;
 			std::unique_lock<std::mutex> lock(bufferSizeMtx);
 			bufferSizeCondVar.wait(lock, [] { return bufferSizeChanged; });
 			bufferSizeChanged = false;
-			std::cout << "PAThread : buffer change status reset to false." << std::endl;
+			//std::cout << "PAThread : buffer change status reset to false." << std::endl;
 			int newBufferSize = bufferSize;
 			lock.unlock();
 			PAErrorCheck(Pa_StopStream(stream));
-			std::cout << std::format("PAThread : new buffer to setup stream is {}.",newBufferSize) << std::endl;
+			//std::cout << std::format("PAThread : new buffer to setup stream is {}.",newBufferSize) << std::endl;
 			PAErrorCheck(Pa_OpenDefaultStream(&stream, 0, 2, paFloat32, SAMPLE_RATE, newBufferSize, audioCallback, nullptr));
-			std::cout << std::format("PAThread : Pa_Stream Reset") << std::endl;
+			//std::cout << std::format("PAThread : Pa_Stream Reset") << std::endl;
 			PAErrorCheck(Pa_StartStream(stream));
-			std::cout << std::format("PAThread : Pa_Stream Restart") << std::endl;
-			if (Pa_IsStreamActive(stream)) std::cout << "PAThread : restart sucess" << std::endl;
+			//std::cout << std::format("PAThread : Pa_Stream Restart") << std::endl;
+			//if (Pa_IsStreamActive(stream)) std::cout << "PAThread : restart sucess" << std::endl;
 		}
 	}
 	PAErrorCheck(Pa_StopStream(stream));
