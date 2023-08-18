@@ -34,10 +34,15 @@ public:
     audioFrame(const int sRate, const int cNum)
         : sampleRate(sRate), channelNum(cNum) {}
 
-    /* copy constructor
-    audioFrame(int sRate, int cNum, const std::vector<T> &aData)
-        : sampleRate(sRate), channelNum(cNum), audioData(aData) {}
-    */
+    // Copy constructor
+    audioFrame(const audioFrame& other)
+        : sampleRate(other.sampleRate), channelNum(other.channelNum),
+        audioData(other.audioData), currentPos(other.currentPos), End(other.End) {}
+
+    // Move Constructor
+    audioFrame(audioFrame&& other) noexcept
+        : sampleRate(other.sampleRate), channelNum(other.channelNum),
+        audioData(std::move(other.audioData)), currentPos(other.currentPos), End(other.End) {}
 
     // constructor which takes a C style array as data, an interface with C libraries.
     audioFrame(int sRate, int cNum, const T *data, size_t size)
@@ -67,7 +72,6 @@ public:
     
     void diffuse(T* &out, size_t framesPerBuffer)
     {
-        
         auto posBegin = audioData.begin() + currentPos;
 
         size_t indexEnd = currentPos + framesPerBuffer * 2;
@@ -84,29 +88,34 @@ public:
         }
         currentPos = indexEnd;
     }
-    /*
+    
     bool resample(size_t targetSampleRate)
     {
-        SRC_STATE *srcState = src_new(SRC_SINC_BEST_QUALITY, this->channelNum, nullptr);
+        SRC_STATE *srcState = src_new(SRC_SINC_BEST_QUALITY, channelNum, nullptr);
 
         const auto resempleRatio = static_cast<double>(targetSampleRate) / static_cast<double>(this->sampleRate);
         const auto newSize = static_cast<int>(audioData.size() * resempleRatio)+1;
         
+        auto out = new float[audioData.size()];
 
+        float* a = &audioData[0];
         SRC_DATA srcData;
-        srcData.data_in = audioData.data();
+        srcData.data_in = a;
         srcData.data_out = out;
         srcData.src_ratio = resempleRatio;
 
-        src_process(srcState, &srcData);
-
-        audioData.assign(out, out + srcData.output_frames_gen);
+        std::cout << src_strerror(src_process(srcState, &srcData)) << std::endl;
+        std::vector<float> temp(out,out + audioData.size());
+        audioData = temp;
+        
+        for (auto& i : audioData)
+            std::cout << i << std::endl;
 
         src_delete(srcState);
 
         sampleRate = targetSampleRate;
         return true;
-    }*/
+    }
 
     // debug functions
     inline void print()
@@ -118,6 +127,8 @@ public:
     }
     inline bool isEnd() { return End; }
     inline std::vector<T> getVec() { return audioData; }
+
+    
 };
 
 #endif

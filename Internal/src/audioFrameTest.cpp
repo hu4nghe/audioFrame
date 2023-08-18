@@ -6,14 +6,16 @@
 constexpr auto PA_BUFFER_SIZE = 32;
 
 static int audioCallback(const void* inputBuffer,
-    void* outputBuffer,
-    unsigned long framesPerBuffer,
-    const PaStreamCallbackTimeInfo* timeInfo,
-    PaStreamCallbackFlags statusFlags,
-    void* userData)
+                         void* outputBuffer,
+                         unsigned long framesPerBuffer,
+                         const PaStreamCallbackTimeInfo* timeInfo,
+                         PaStreamCallbackFlags statusFlags,
+                         void* userData)
 {
     auto out = static_cast <float*>(outputBuffer);
     auto sndFile = static_cast<audioFrame<float>*>(userData);
+
+
 
     sndFile->diffuse(out, framesPerBuffer);
     if (sndFile->isEnd() == true) return paComplete;
@@ -35,10 +37,23 @@ int main()
     audioFrame<float> input;
     input.readSoundFile(inpath);
 
+
+
+    input.resample(48000);
+    std::cout << "resampled " << std::endl;
+    
+    
+
+    std::cin.get();
+
+
+
+
+
     // Set up PortAudio stream and start
     error_check(Pa_Initialize());
     PaStream* stream;
-    error_check(Pa_OpenDefaultStream(&stream, 0, 2, PA_SAMPLE_TYPE, 44100, PA_BUFFER_SIZE, audioCallback, &input));
+    error_check(Pa_OpenDefaultStream(&stream, 0, 2, PA_SAMPLE_TYPE, 48000, PA_BUFFER_SIZE, audioCallback, &input));
     error_check(Pa_StartStream(stream));
 
     std::cout << "Playing..." << std::endl;

@@ -1,8 +1,8 @@
 ﻿#include <atomic>
 #include <condition_variable>
 #include <csignal>
-#include <mutex>
 #include <thread>
+#include <mutex>
 #include <queue>
 
 #include "Processing.NDI.Lib.h" 
@@ -12,7 +12,7 @@ constexpr auto SAMPLE_RATE = 44100;
 
 // System signal catch handler
 static std::atomic<bool> exit_loop(false);
-static void sigintHandler(int) { exit_loop = true; }
+static void sigIntHandler(int) { exit_loop = true; }
 
 //Global variables for multi-thread communication.
 std::mutex audioDataMtx;
@@ -34,7 +34,9 @@ void PAErrorCheck(PaError err)
 
 void NDIAudioTread()
 {
-	std::signal(SIGINT, sigintHandler);
+	std::signal(SIGINT, sigIntHandler);
+
+	NDIlib_initialize();
 
 	// Create a NDI finder and try to find a source NDI 
 	const NDIlib_find_create_t NDIFindCreateDesc;
@@ -101,7 +103,11 @@ void NDIAudioTread()
 			NDIlib_util_audio_to_interleaved_32f_v2(&audioInput, &audio_frame_32bpp_interleaved);
 
 			// Transfer the ownership of audio data to smart pointer and push it into the queue.
-			audioFrame audioData(audioInput.sample_rate, audioInput.no_channels, audio_frame_32bpp_interleaved.p_data, audioInput.no_samples * audioInput.no_channels);
+			audioFrame audioData(audioInput.sample_rate, 
+								 audioInput.no_channels,
+								 audio_frame_32bpp_interleaved.p_data, 
+								 audioInput.no_samples * audioInput.no_channels);
+
 			std::lock_guard<std::mutex> lock(audioDataMtx);
 			audioBufferQueue.push(std::move(audioData));
 			audioDataCondVar.notify_one();
@@ -112,11 +118,12 @@ void NDIAudioTread()
 	NDIlib_destroy();
 }
 
-static int audioCallback(const void* inputBuffer, void* outputBuffer,
-	unsigned long framesPerBuffer,
-	const PaStreamCallbackTimeInfo* timeInfo,
-	PaStreamCallbackFlags statusFlags,
-	void* userData)
+static int audioCallback(const void* inputBuffer, 
+						 void* outputBuffer,
+						 unsigned long framesPerBuffer,
+						 const PaStreamCallbackTimeInfo* timeInfo,
+						 PaStreamCallbackFlags statusFlags,
+						 void* userData)
 {
 	//std::cout << std::format("PAThread : Buffer size is {}", framesPerBuffer) << std::endl;
 	auto out = static_cast<float*>(outputBuffer);
@@ -140,6 +147,8 @@ static int audioCallback(const void* inputBuffer, void* outputBuffer,
 
 void PAThread()
 {
+	PAErrorCheck(Pa_Initialize());
+
 	//open a default stream at the start
 	PaStream* stream;
 	PAErrorCheck(Pa_OpenDefaultStream(&stream, 0, 2, paFloat32, SAMPLE_RATE, 0, nullptr, nullptr));
@@ -170,19 +179,17 @@ void PAThread()
 	}
 	PAErrorCheck(Pa_StopStream(stream));
 	PAErrorCheck(Pa_CloseStream(stream));
+	PAErrorCheck(Pa_Terminate());
 }
 
 int main()
 {
-	PAErrorCheck(Pa_Initialize());
-	NDIlib_initialize();
-
+	//nothing here, only calls the thread
 	std::thread ndiThread(NDIAudioTread);
 	std::thread portaudio(PAThread);
 
 	ndiThread.detach();
 	portaudio.join();
 
-	PAErrorCheck(Pa_Terminate());
 	return 0;
 }
