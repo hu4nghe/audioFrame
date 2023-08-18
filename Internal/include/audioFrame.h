@@ -45,18 +45,14 @@ public:
         audioData(std::move(other.audioData)), currentPos(other.currentPos), End(other.End) {}
 
     // constructor which takes a C style array as data, an interface with C libraries.
-    audioFrame(int sRate, int cNum, const T *data, size_t size)
+    audioFrame(const int sRate, const int cNum, const T *data, const size_t size)
+        : sampleRate(sRate), channelNum(cNum), currentPos(0), End(false)
     {
-        sampleRate = sRate;
-        channelNum = cNum;
         audioData.assign(data, data + size);
-        currentPos = 0;
-        End = false;
     }
 
     inline size_t getSize() { return this->audioData.size(); }
-
-    // move data to C style array, an interface with C libraries.
+    inline bool isEnd() { return End; }
     inline void moveToCArray(std::unique_ptr<T[]> &ptr){ std::copy(audioData.begin(), audioData.end(), ptr.get()); }
 
     void readSoundFile(const std::filesystem::path filePath)
@@ -64,13 +60,12 @@ public:
         SndfileHandle soundFile(filePath.string(), SFM_READ);
         sampleRate = soundFile.samplerate();
         channelNum = soundFile.channels();
-
-        audioData.resize(soundFile.frames()*2);
-        soundFile.read(&audioData[0], int(soundFile.frames()*2));
+        audioData.resize(soundFile.frames()* channelNum);
+        soundFile.read(&audioData[0], int(soundFile.frames()* channelNum));
         currentPos = 0;
     }
     
-    void diffuse(T* &out, size_t framesPerBuffer,int outputSampleRate)
+    void diffuse(T* &out, const size_t framesPerBuffer, const int outputSampleRate)
     {
         auto posBegin = audioData.begin() + currentPos;
         size_t indexEnd = currentPos + framesPerBuffer * channelNum;
@@ -88,11 +83,10 @@ public:
         else
         {
             //debug output
-            std::cout << std::format("playing {} to {}, total {}.percentage : {}%", currentPos, indexEnd, audioData.size(), (static_cast<double>(indexEnd) / static_cast<double>(audioData.size())) * 100) << std::endl;
+            //std::cout << std::format("playing {} to {}, total {}.percentage : {}%", currentPos, indexEnd, audioData.size(), (static_cast<double>(indexEnd) / static_cast<double>(audioData.size())) * 100) << std::endl;
             currentData = new T[framesPerBuffer * channelNum];
             std::copy(posBegin, posBegin + (framesPerBuffer * channelNum), currentData);
         }
-        std::cout << "Data extracted" << std::endl;
         // Check if we need to resample audio data
         if (outputSampleRate == sampleRate)
         {
@@ -101,11 +95,18 @@ public:
         }
         else
         {
-            SRC_STATE* state;
+            SRC_STATE *state;
             SRC_DATA data;
 
             data.end_of_input = 0;
-
+            if (End)
+                data.input_frames = endOfAudioLen;
+            else
+                data.input_frames = framesPerBuffer;
+            data.data_in = currentData;
+            data.data_out = out;
+            data.src_ratio = static_cast<double>(outputSampleRate) / static_cast<double>(sampleRate);
+            data.output_frames = data.input_frames;
             // Initialize libsamplerate
             state = src_new(SRC_SINC_BEST_QUALITY, channelNum, nullptr);
             if (state == nullptr)
@@ -114,22 +115,13 @@ public:
                 exit(EXIT_FAILURE);
             }
 
-            data.data_in = currentData;
-            data.data_out = out;
-
-            if (End)
-                data.input_frames = endOfAudioLen;
-            else
-                data.input_frames = framesPerBuffer;
-
             src_process(state, &data);
-
             src_delete(state);
             
         }
         currentPos = indexEnd;
     }
-    
+    /*
     bool resample(size_t targetSampleRate)
     {
         SRC_STATE *srcState = src_new(SRC_SINC_BEST_QUALITY, channelNum, nullptr);
@@ -157,7 +149,7 @@ public:
         sampleRate = targetSampleRate;
         return true;
     }
-
+    */
     // debug functions
     inline void print()
     {
@@ -166,7 +158,7 @@ public:
             std::cout << i << std::endl;
         }
     }
-    inline bool isEnd() { return End; }
+    
     inline std::vector<T> getVec() { return audioData; }
 
     

@@ -8,7 +8,7 @@
 #include "Processing.NDI.Lib.h" 
 #include "audioFrame.h"
 
-constexpr auto SAMPLE_RATE = 48000;
+constexpr auto SAMPLE_RATE = 44100;
 
 // System signal catch handler
 static std::atomic<bool> exit_loop(false);
@@ -139,7 +139,7 @@ static int audioCallback(const void* inputBuffer,
 	//Copy data to portaudio output stream.
 	audioSamples.diffuse(out, framesPerBuffer, SAMPLE_RATE);
 
-	//std::cout << std::format("PAThread : Buffer size is {}, Callback normally called {} times.", framesPerBuffer, callbackCount) << std::endl;
+	std::cout << std::format("PAThread : Buffer size is {}.", framesPerBuffer) << std::endl;
 
 	return paContinue;
 
