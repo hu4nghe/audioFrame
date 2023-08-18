@@ -13,11 +13,9 @@ static int audioCallback(const void* inputBuffer,
                          void* userData)
 {
     auto out = static_cast <float*>(outputBuffer);
-    auto sndFile = static_cast<audioFrame<float>*>(userData);
+    auto sndFile = static_cast<audioFrame<float>*>(userData);      
 
-
-
-    sndFile->diffuse(out, framesPerBuffer);
+    sndFile->diffuse(out, framesPerBuffer,44100);
     if (sndFile->isEnd() == true) return paComplete;
     else return paContinue;
 }

@@ -70,21 +70,62 @@ public:
         currentPos = 0;
     }
     
-    void diffuse(T* &out, size_t framesPerBuffer)
+    void diffuse(T* &out, size_t framesPerBuffer,int outputSampleRate)
     {
         auto posBegin = audioData.begin() + currentPos;
+        size_t indexEnd = currentPos + framesPerBuffer * channelNum;
+        T* currentData = nullptr;
+        size_t endOfAudioLen = 0;
 
-        size_t indexEnd = currentPos + framesPerBuffer * 2;
+        // Extract current audio data slice
         if (indexEnd > audioData.size())
         {
-            std::copy(posBegin, audioData.end(), out);
-            End = true;
+            endOfAudioLen = audioData.end() - posBegin;
+            currentData = new T[endOfAudioLen];
+            std::copy(posBegin, audioData.end(), currentData);            
+            End = true;                   
+        }
+        else
+        {
+            //debug output
+            std::cout << std::format("playing {} to {}, total {}.percentage : {}%", currentPos, indexEnd, audioData.size(), (static_cast<double>(indexEnd) / static_cast<double>(audioData.size())) * 100) << std::endl;
+            currentData = new T[framesPerBuffer * channelNum];
+            std::copy(posBegin, posBegin + (framesPerBuffer * channelNum), currentData);
+        }
+        std::cout << "Data extracted" << std::endl;
+        // Check if we need to resample audio data
+        if (outputSampleRate == sampleRate)
+        {
+            std::copy(currentData, currentData + framesPerBuffer * channelNum, out);
             return;
         }
         else
         {
-            std::cout << std::format("playing {} to {}, total {}.percentage : {}%", currentPos, indexEnd, audioData.size(), (static_cast<double>(indexEnd) / static_cast<double>(audioData.size()))*100) << std::endl;
-            std::copy(posBegin, posBegin + (framesPerBuffer * 2), out);
+            SRC_STATE* state;
+            SRC_DATA data;
+
+            data.end_of_input = 0;
+
+            // Initialize libsamplerate
+            state = src_new(SRC_SINC_BEST_QUALITY, channelNum, nullptr);
+            if (state == nullptr)
+            {
+                std::cout << std::format("Error : Initialisation failed !") << std::endl;
+                exit(EXIT_FAILURE);
+            }
+
+            data.data_in = currentData;
+            data.data_out = out;
+
+            if (End)
+                data.input_frames = endOfAudioLen;
+            else
+                data.input_frames = framesPerBuffer;
+
+            src_process(state, &data);
+
+            src_delete(state);
+            
         }
         currentPos = indexEnd;
     }
