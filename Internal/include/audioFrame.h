@@ -25,7 +25,6 @@ private:
     std::vector<T> audioData;
     size_t currentPos;
     //debug members
-    bool End;
 
 public:
     audioFrame() = default;
@@ -37,23 +36,21 @@ public:
     // Copy constructor
     audioFrame(const audioFrame& other)
         : sampleRate(other.sampleRate), channelNum(other.channelNum),
-        audioData(other.audioData), currentPos(other.currentPos), End(other.End) {}
+        audioData(other.audioData), currentPos(other.currentPos) {}
 
     // Move Constructor
     audioFrame(audioFrame&& other) noexcept
         : sampleRate(other.sampleRate), channelNum(other.channelNum),
-        audioData(std::move(other.audioData)), currentPos(other.currentPos), End(other.End) {}
+        audioData(std::move(other.audioData)), currentPos(other.currentPos) {}
 
     // constructor which takes a C style array as data, an interface with C libraries.
     audioFrame(const int sRate, const int cNum, const T *data, const size_t size)
-        : sampleRate(sRate), channelNum(cNum), currentPos(0), End(false)
+        : sampleRate(sRate), channelNum(cNum), currentPos(0)
     {
         audioData.assign(data, data + size);
     }
 
     inline size_t getSize() { return this->audioData.size(); }
-    inline bool isEnd() { return End; }
-    inline void moveToCArray(std::unique_ptr<T[]> &ptr){ std::copy(audioData.begin(), audioData.end(), ptr.get()); }
 
     void readSoundFile(const std::filesystem::path filePath)
     {
@@ -77,8 +74,7 @@ public:
         {
             endOfAudioLen = audioData.end() - posBegin;
             currentData = new T[endOfAudioLen];
-            std::copy(posBegin, audioData.end(), currentData);            
-            End = true;                   
+            std::copy(posBegin, audioData.end(), currentData);                   
         }
         else
         {
@@ -99,7 +95,7 @@ public:
             SRC_DATA data;
 
             data.end_of_input = 0;
-            if (End)
+            if (indexEnd > audioData.size())
                 data.input_frames = endOfAudioLen;
             else
                 data.input_frames = framesPerBuffer;
@@ -120,48 +116,7 @@ public:
             
         }
         currentPos = indexEnd;
-    }
-    /*
-    bool resample(size_t targetSampleRate)
-    {
-        SRC_STATE *srcState = src_new(SRC_SINC_BEST_QUALITY, channelNum, nullptr);
-
-        const auto resempleRatio = static_cast<double>(targetSampleRate) / static_cast<double>(this->sampleRate);
-        const auto newSize = static_cast<int>(audioData.size() * resempleRatio)+1;
-        
-        auto out = new float[audioData.size()];
-
-        float* a = &audioData[0];
-        SRC_DATA srcData;
-        srcData.data_in = a;
-        srcData.data_out = out;
-        srcData.src_ratio = resempleRatio;
-
-        std::cout << src_strerror(src_process(srcState, &srcData)) << std::endl;
-        std::vector<float> temp(out,out + audioData.size());
-        audioData = temp;
-        
-        for (auto& i : audioData)
-            std::cout << i << std::endl;
-
-        src_delete(srcState);
-
-        sampleRate = targetSampleRate;
-        return true;
-    }
-    */
-    // debug functions
-    inline void print()
-    {
-        for (auto &i : audioData)
-        {
-            std::cout << i << std::endl;
-        }
-    }
-    
-    inline std::vector<T> getVec() { return audioData; }
-
-    
+    }    
 };
 
-#endif
+#endif// AUDIOFRAME_H

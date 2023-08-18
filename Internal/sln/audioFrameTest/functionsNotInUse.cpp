@@ -1,21 +1,29 @@
 /*
-bool resample(size_t targetSampleRate)
-    {
-        SRC_STATE *srcState = src_new(SRC_SINC_BEST_QUALITY, this->channelNum, nullptr);
+   bool resample(size_t targetSampleRate)
+   {
+       SRC_STATE *srcState = src_new(SRC_SINC_BEST_QUALITY, channelNum, nullptr);
 
-        const auto resempleRatio = static_cast<double>(targetSampleRate) / static_cast<double>(this->sampleRate);
-        const auto newSize = static_cast<int>(audioData.size() * resempleRatio)+1;
-        std::vector<T> resempledAudio(newSize);
+       const auto resempleRatio = static_cast<double>(targetSampleRate) / static_cast<double>(this->sampleRate);
+       const auto newSize = static_cast<int>(audioData.size() * resempleRatio)+1;
 
-        SRC_DATA srcData;
-        srcData.data_in = audioData.data();
-        srcData.data_out = resempledAudio.data();
-        srcData.input_frames = static_cast<long>(audioData.size());
-        srcData.output_frames = static_cast<long>(resempledAudio.size());
-        srcData.src_ratio = resempleRatio;
+       auto out = new float[audioData.size()];
 
-        src_process(srcState, &srcData);
+       float* a = &audioData[0];
+       SRC_DATA srcData;
+       srcData.data_in = a;
+       srcData.data_out = out;
+       srcData.src_ratio = resempleRatio;
 
-        sampleRate = targetSampleRate;
-        return true;
-    }*/
+       std::cout << src_strerror(src_process(srcState, &srcData)) << std::endl;
+       std::vector<float> temp(out,out + audioData.size());
+       audioData = temp;
+
+       for (auto& i : audioData)
+           std::cout << i << std::endl;
+
+       src_delete(srcState);
+
+       sampleRate = targetSampleRate;
+       return true;
+   }
+   */

@@ -16,8 +16,7 @@ static int audioCallback(const void* inputBuffer,
     auto sndFile = static_cast<audioFrame<float>*>(userData);      
 
     sndFile->diffuse(out, framesPerBuffer,44100);
-    if (sndFile->isEnd() == true) return paComplete;
-    else return paContinue;
+    return paContinue;
 }
 
 void error_check(PaError err)
@@ -37,7 +36,7 @@ int main()
 
 
 
-    input.resample(48000);
+    
     std::cout << "resampled " << std::endl;
     
     
