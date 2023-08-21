@@ -104,7 +104,7 @@ public:
             data.src_ratio = static_cast<double>(outputSampleRate) / static_cast<double>(sampleRate);
             data.output_frames = data.input_frames;
             // Initialize libsamplerate
-            state = src_new(SRC_SINC_BEST_QUALITY, channelNum, nullptr);
+            state = src_new(SRC_SINC_FASTEST, channelNum, nullptr);
             if (state == nullptr)
             {
                 std::cout << std::format("Error : Initialisation failed !") << std::endl;

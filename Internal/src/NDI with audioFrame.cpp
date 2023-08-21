@@ -139,7 +139,7 @@ static int audioCallback(const void* inputBuffer,
 	//Copy data to portaudio output stream.
 	audioSamples.diffuse(out, framesPerBuffer, SAMPLE_RATE);
 
-	std::cout << std::format("PAThread : Buffer size is {}.", framesPerBuffer) << std::endl;
+	//std::cout << std::format("PAThread : Buffer size is {}.", framesPerBuffer) << std::endl;
 
 	return paContinue;
 
