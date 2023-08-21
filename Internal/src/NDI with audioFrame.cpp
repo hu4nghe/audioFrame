@@ -8,7 +8,7 @@
 #include "Processing.NDI.Lib.h" 
 #include "audioFrame.h"
 
-constexpr auto SAMPLE_RATE = 44100;
+constexpr auto SAMPLE_RATE = 48000;
 
 // System signal catch handler
 static std::atomic<bool> exit_loop(false);
