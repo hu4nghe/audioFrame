@@ -43,6 +43,10 @@ public:
         : sampleRate(other.sampleRate), channelNum(other.channelNum),
         audioData(std::move(other.audioData)), currentPos(other.currentPos) {}
 
+    // Move constructor for C style array
+    audioFrame(int sampleRate, int channelNum, float* data, size_t dataSize, int currentPos) noexcept
+        : sampleRate(sampleRate), channelNum(channelNum), audioData(data, data + dataSize), currentPos(0) {}
+
     // constructor which takes a C style array as data, an interface with C libraries.
     audioFrame(const int sRate, const int cNum, const T *data, const size_t size)
         : sampleRate(sRate), channelNum(cNum), currentPos(0)
@@ -78,8 +82,6 @@ public:
         }
         else
         {
-            //debug output
-            //std::cout << std::format("playing {} to {}, total {}.percentage : {}%", currentPos, indexEnd, audioData.size(), (static_cast<double>(indexEnd) / static_cast<double>(audioData.size())) * 100) << std::endl;
             currentData = new T[framesPerBuffer * channelNum];
             std::copy(posBegin, posBegin + (framesPerBuffer * channelNum), currentData);
         }
