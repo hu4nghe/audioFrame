@@ -5,7 +5,7 @@
 #define PA_SAMPLE_TYPE paFloat32
 constexpr auto PA_BUFFER_SIZE = 32;
 
-static int audioCallback(const void* inputBuffer,
+static int NDIAudioCallback(const void* inputBuffer,
                          void* outputBuffer,
                          unsigned long framesPerBuffer,
                          const PaStreamCallbackTimeInfo* timeInfo,
@@ -15,7 +15,7 @@ static int audioCallback(const void* inputBuffer,
     auto out = static_cast <float*>(outputBuffer);
     auto sndFile = static_cast<audioFrame<float>*>(userData);      
 
-    sndFile->diffuse(out, framesPerBuffer,44100);
+    sndFile->diffuse(out, framesPerBuffer);
     return paContinue;
 }
 
@@ -50,7 +50,7 @@ int main()
     // Set up PortAudio stream and start
     error_check(Pa_Initialize());
     PaStream* stream;
-    error_check(Pa_OpenDefaultStream(&stream, 0, 2, PA_SAMPLE_TYPE, 48000, PA_BUFFER_SIZE, audioCallback, &input));
+    error_check(Pa_OpenDefaultStream(&stream, 0, 2, PA_SAMPLE_TYPE, 48000, PA_BUFFER_SIZE, NDIAudioCallback, &input));
     error_check(Pa_StartStream(stream));
 
     std::cout << "Playing..." << std::endl;

@@ -55,6 +55,7 @@ public:
     }
 
     inline size_t getSize() { return this->audioData.size(); }
+    inline int getRate() { return this->sampleRate; }
 
     void readSoundFile(const std::filesystem::path filePath)
     {
@@ -66,47 +67,27 @@ public:
         currentPos = 0;
     }
     
-    void diffuse(T* &out, const size_t framesPerBuffer, const int outputSampleRate)
+    void resample(const int outputSampleRate)
     {
-        auto posBegin = audioData.begin() + currentPos;
-        size_t indexEnd = currentPos + framesPerBuffer * channelNum;
-        T* currentData = nullptr;
-        size_t endOfAudioLen = 0;
-
-        // Extract current audio data slice
-        if (indexEnd > audioData.size())
-        {
-            endOfAudioLen = audioData.end() - posBegin;
-            currentData = new T[endOfAudioLen];
-            std::copy(posBegin, audioData.end(), currentData);                   
-        }
-        else
-        {
-            currentData = new T[framesPerBuffer * channelNum];
-            std::copy(posBegin, posBegin + (framesPerBuffer * channelNum), currentData);
-        }
-        // Check if we need to resample audio data
         if (outputSampleRate == sampleRate)
-        {
-            std::copy(currentData, currentData + framesPerBuffer * channelNum, out);
             return;
-        }
         else
         {
-            SRC_STATE *state;
+            sampleRate = outputSampleRate;
+            SRC_STATE* state;
             SRC_DATA data;
 
-            data.end_of_input = 0;
-            if (indexEnd > audioData.size())
-                data.input_frames = endOfAudioLen;
-            else
-                data.input_frames = framesPerBuffer;
-            data.data_in = currentData;
+            data.end_of_input = false;
+
+            T* out = new T[audioData.size() * channelNum];
+
+            data.input_frames = audioData.size() / 2;
+            data.data_in = &audioData[0];
             data.data_out = out;
             data.src_ratio = static_cast<double>(outputSampleRate) / static_cast<double>(sampleRate);
-            data.output_frames = data.input_frames;
-            // Initialize libsamplerate
-            state = src_new(SRC_SINC_FASTEST, channelNum, nullptr);
+            data.output_frames = audioData.size();
+
+            state = src_new(SRC_LINEAR, channelNum, nullptr);
             if (state == nullptr)
             {
                 std::cout << std::format("Error : Initialisation failed !") << std::endl;
@@ -114,9 +95,29 @@ public:
             }
 
             src_process(state, &data);
-            src_delete(state);
-            
+            audioData.assign(out, out + (data.output_frames_gen)* channelNum);
+            data.end_of_input = true;
+            src_delete(state);    
         }
+    }
+
+    void diffuse(T* &out, const size_t framesPerBuffer)
+    {
+        auto posBegin = audioData.begin() + currentPos;
+        size_t indexEnd = currentPos + (framesPerBuffer * channelNum);
+        size_t endOfAudioLen = 0;
+
+        // Extract current audio data slice
+        if (indexEnd > audioData.size())
+        {
+            endOfAudioLen = audioData.end() - posBegin;
+            std::copy(posBegin, audioData.end(), out);                   
+        }
+        else
+        {
+            std::copy(posBegin, posBegin + (framesPerBuffer * channelNum), out);
+        }
+        
         currentPos = indexEnd;
     }    
 };
