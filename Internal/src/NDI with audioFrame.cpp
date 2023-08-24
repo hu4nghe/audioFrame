@@ -8,7 +8,7 @@
 #include "Processing.NDI.Lib.h" 
 #include "audioFrame.h"
 
-constexpr auto SAMPLE_RATE = 44100;
+constexpr auto SAMPLE_RATE = 48000;
 
 // System signal catch handler
 static std::atomic<bool> exit_loop(false);
@@ -125,7 +125,7 @@ static int NDIAudioCallback(const void* inputBuffer,
 	//Get data from the queue.
 	auto audioSamples = std::move(audioBufferQueue.front());
 	audioBufferQueue.pop();
-	std::cout << std::format("queue element count:{} ", audioBufferQueue.size()) << std::endl;
+	//std::cout << std::format("queue element count:{} ", audioBufferQueue.size()) << std::endl;
 	//Copy data to portaudio output stream.
 	audioSamples.diffuse(out, framesPerBuffer);
 
@@ -182,7 +182,7 @@ void portAudioThread()
 	PAErrorCheck(Pa_StartStream(microStream));
 	*/
 	PaStream* stream;
-	PAErrorCheck(Pa_OpenDefaultStream(&stream, 0, 2, paFloat32, SAMPLE_RATE, 0, nullptr, nullptr));
+	PAErrorCheck(Pa_OpenDefaultStream(&stream, 0, 2, paFloat32, 44100, 0, nullptr, nullptr));
 	PAErrorCheck(Pa_StartStream(stream));
 
 	while (!exit_loop)
@@ -193,7 +193,7 @@ void portAudioThread()
 			{
 				int newBufferSize = bufferSize.load();
 				PAErrorCheck(Pa_AbortStream(stream));
-				PAErrorCheck(Pa_OpenDefaultStream(&stream, 2, 2, paFloat32, SAMPLE_RATE, newBufferSize, NDIAudioCallback, nullptr));
+				PAErrorCheck(Pa_OpenDefaultStream(&stream, 2, 2, paFloat32, 48000, newBufferSize, NDIAudioCallback, nullptr));
 				PAErrorCheck(Pa_StartStream(stream));
 			}
 			
@@ -222,3 +222,4 @@ int main()
 	                  
 	return 0;
 }
+

@@ -47,8 +47,8 @@ public:
         audioData(std::move(other.audioData)), currentPos(other.currentPos) {}
 
     // Move constructor for C style array
-    audioFrame(int sampleRate, int channelNum, float* data, size_t dataSize, int currentPos) noexcept
-        : sampleRate(sampleRate), channelNum(channelNum), audioData(data, data + dataSize), currentPos(0) {}
+    audioFrame(int sampleRate, int channelNum, std::vector<T>&& data) noexcept
+        : sampleRate(sampleRate), channelNum(channelNum), audioData(data), currentPos(0) {}
 
     // constructor which takes a C style array as data, an interface with C libraries.
     audioFrame(const int sRate, const int cNum, const T *data, const size_t size)
@@ -76,16 +76,16 @@ public:
             return;
         else
         {
+            auto start = std::chrono::high_resolution_clock::now();
+
             sampleRate = outputSampleRate;
+            T* out = new T[audioData.size() * channelNum];
+            
             SRC_STATE* state;
             SRC_DATA data;
-
             data.end_of_input = false;
-
-            T* out = new T[audioData.size() * channelNum];
-
-            data.input_frames = audioData.size() / 2;
-            data.data_in = &audioData[0];
+            data.input_frames = audioData.size() / channelNum;
+            data.data_in = std::move(audioData.data());
             data.data_out = out;
             data.src_ratio = static_cast<double>(outputSampleRate) / static_cast<double>(sampleRate);
             data.output_frames = audioData.size();
@@ -97,15 +97,28 @@ public:
                 exit(EXIT_FAILURE);
             }
 
-            src_process(state, &data);
+            std::cout << "Initialize time : " << std::chrono::duration_cast<std::chrono::microseconds>(std::chrono::high_resolution_clock::now() - start).count() << " microseconds." << std::endl;
+
+            auto start1 = std::chrono::high_resolution_clock::now();
+            src_process(state, &data); 
+            std::cout << "Execution time  : " << std::chrono::duration_cast<std::chrono::microseconds>(std::chrono::high_resolution_clock::now() - start1).count() << " microseconds." << std::endl;
+
+            auto start2 = std::chrono::high_resolution_clock::now();
             audioData.assign(out, out + (data.output_frames_gen)* channelNum);
-            data.end_of_input = true;
+            std::cout << "Copy array time : " << std::chrono::duration_cast<std::chrono::microseconds>(std::chrono::high_resolution_clock::now() - start2).count() << " microseconds." << std::endl;
+            
+            auto start3 = std::chrono::high_resolution_clock::now();
             src_delete(state);    
+            std::cout << "Clean up time   : " << std::chrono::duration_cast<std::chrono::microseconds>(std::chrono::high_resolution_clock::now() - start3).count() << " microseconds." << std::endl;
         }
     }
 
     void diffuse(T* &out, const size_t framesPerBuffer)
     {
+        auto start = std::chrono::high_resolution_clock::now();
+        
+        
+
         auto posBegin = audioData.begin() + currentPos;
         size_t indexEnd = currentPos + (framesPerBuffer * channelNum);
         size_t endOfAudioLen = 0;
@@ -122,6 +135,8 @@ public:
         }
         
         currentPos = indexEnd;
+        
+        std::cout << "difuse time     : " << std::chrono::duration_cast<std::chrono::microseconds>(std::chrono::high_resolution_clock::now() - start).count() << " microseconds." << std::endl;
     }    
 };
 
