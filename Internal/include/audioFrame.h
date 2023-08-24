@@ -11,6 +11,9 @@
 #include <memory>
 #include <type_traits>
 
+#include <atomic>
+#include <thread>
+
 #include "portaudio.h"
 #include "sndfile.hh"
 #include "samplerate.h"

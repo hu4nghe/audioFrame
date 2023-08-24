@@ -21,7 +21,7 @@ std::condition_variable audioDataCondVar;
 std::condition_variable bufferSizeCondVar;
 std::queue<audioFrame<float>> audioBufferQueue;
 bool bufferSizeChanged = false;
-int bufferSize = 0;
+size_t bufferSize = 0;
 
 void PAErrorCheck(PaError err)
 {
@@ -177,7 +177,7 @@ void portAudioThread()
 	std::signal(SIGINT, sigIntHandler);
 
 	PAErrorCheck(Pa_Initialize());
-	std::this_thread::sleep_for(std::chrono::seconds(10));
+	//std::this_thread::sleep_for(std::chrono::seconds(10));
 	/* test : sndfile and microphone input
 	SndfileHandle sndFile("D:/Music/Mahler Symphony No.2/Mahler- Symphony #2 In C Minor, 'Resurrection' - 5g. Mit Aufschwung Aber Nicht Eilen.wav");
 	PaStream* sndfileStream;
@@ -206,7 +206,6 @@ void portAudioThread()
 			PAErrorCheck(Pa_StopStream(stream));
 			PAErrorCheck(Pa_OpenDefaultStream(&stream, 2, 2, paFloat32, SAMPLE_RATE, newBufferSize, NDIAudioCallback, nullptr));
 			PAErrorCheck(Pa_StartStream(stream));
-			Pa_Sleep(1000 * 1000);
 		}
 	}
 	/* test : sndfile and microphone input
@@ -228,6 +227,6 @@ int main()
 
 	ndiThread.join();
 	ndiPortaudio.join();
-
+	                  
 	return 0;
 }
