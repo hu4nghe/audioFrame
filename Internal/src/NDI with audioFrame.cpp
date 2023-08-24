@@ -8,7 +8,7 @@
 #include "Processing.NDI.Lib.h" 
 #include "audioFrame.h"
 
-constexpr auto SAMPLE_RATE = 48000;
+constexpr auto SAMPLE_RATE = 44100;
 
 // System signal catch handler
 static std::atomic<bool> exit_loop(false);
@@ -16,12 +16,11 @@ static void sigIntHandler(int) { exit_loop = true; }
 
 //Global variables for multi-thread communication.
 std::mutex audioDataMtx;
-std::mutex bufferSizeMtx;
 std::condition_variable audioDataCondVar;
-std::condition_variable bufferSizeCondVar;
 std::queue<audioFrame<float>> audioBufferQueue;
-bool bufferSizeChanged = false;
-size_t bufferSize = 0;
+
+std::atomic<bool> bufferSizeChanged(false);
+std::atomic <size_t> bufferSize(0);
 
 void PAErrorCheck(PaError err)
 {
@@ -73,8 +72,6 @@ void NDIAudioTread()
 	NDIlib_find_destroy(pNDIFind);
 
 	// NDI data capture loop
-	int currentSampleNum = 0;
-
 	NDIlib_audio_frame_v2_t audioInput;
 	while (!exit_loop)
 	{
@@ -96,14 +93,10 @@ void NDIAudioTread()
 			audioData.resample(SAMPLE_RATE);
 
 			// If the portaudio do not know the buffer size, pass it to portAudio output thread.
-			if (currentSampleNum != audioInput.no_samples)
+			if (bufferSize.load() != audioInput.no_samples)
 			{
-				currentSampleNum = audioInput.no_samples;
-				std::unique_lock<std::mutex> lock(bufferSizeMtx);
-				bufferSize = audioData.getSize() / audioInput.no_channels;
-				bufferSizeChanged = true;
-				lock.unlock();
-				bufferSizeCondVar.notify_one();
+				bufferSize.store(audioInput.no_samples);
+				bufferSizeChanged.store(true);
 			}
 
 			// Transfer the ownership of audio data and push it into the queue.
@@ -177,7 +170,6 @@ void portAudioThread()
 	std::signal(SIGINT, sigIntHandler);
 
 	PAErrorCheck(Pa_Initialize());
-	//std::this_thread::sleep_for(std::chrono::seconds(10));
 	/* test : sndfile and microphone input
 	SndfileHandle sndFile("D:/Music/Mahler Symphony No.2/Mahler- Symphony #2 In C Minor, 'Resurrection' - 5g. Mit Aufschwung Aber Nicht Eilen.wav");
 	PaStream* sndfileStream;
@@ -197,15 +189,15 @@ void portAudioThread()
 	{
 		if (Pa_IsStreamActive(stream))
 		{
-			std::unique_lock<std::mutex> lock(bufferSizeMtx);
-			bufferSizeCondVar.wait(lock, [] { return bufferSizeChanged; });
-			bufferSizeChanged = false;
-			int newBufferSize = bufferSize;
-			lock.unlock();
-
-			PAErrorCheck(Pa_StopStream(stream));
-			PAErrorCheck(Pa_OpenDefaultStream(&stream, 2, 2, paFloat32, SAMPLE_RATE, newBufferSize, NDIAudioCallback, nullptr));
-			PAErrorCheck(Pa_StartStream(stream));
+			if (bufferSizeChanged.exchange(false))
+			{
+				int newBufferSize = bufferSize.load();
+				PAErrorCheck(Pa_AbortStream(stream));
+				PAErrorCheck(Pa_OpenDefaultStream(&stream, 2, 2, paFloat32, SAMPLE_RATE, newBufferSize, NDIAudioCallback, nullptr));
+				PAErrorCheck(Pa_StartStream(stream));
+			}
+			
+				
 		}
 	}
 	/* test : sndfile and microphone input
