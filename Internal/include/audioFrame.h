@@ -77,6 +77,7 @@ public:
             
             SRC_STATE* state;
             SRC_DATA data;
+            std::cout << std::format("Input frame : {}; Output frame : {}", audioData.size() / channelNum ,outputSize) << std::endl;
             data.end_of_input = false;
             data.input_frames = audioData.size() / channelNum;
             data.data_in = std::move(audioData.data());
@@ -91,6 +92,7 @@ public:
                 exit(EXIT_FAILURE);
             }
             src_process(state, &data);
+            std::cout << std::format("Input frame used : {}; Output frame gen : {}", data.input_frames_used, data.output_frames_gen) << std::endl;
             audioData.assign(out, out + (data.output_frames_gen)* channelNum);
             src_delete(state);
 

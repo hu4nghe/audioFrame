@@ -22,8 +22,6 @@ std::queue<audioFrame<float>> audioBufferQueue;
 std::atomic<bool> bufferSizeChanged(false);
 std::atomic <size_t> bufferSize(0);
 
-int paCallCount = 0;
-
 void PAErrorCheck(PaError err)
 {
 	if (err != paNoError)
@@ -32,6 +30,8 @@ void PAErrorCheck(PaError err)
 		exit(EXIT_FAILURE);
 	}
 }
+
+
 
 void NDIAudioTread()
 {
@@ -74,7 +74,6 @@ void NDIAudioTread()
 	NDIlib_find_destroy(pNDIFind);
 
 	// NDI data capture loop
-	int resampleCallCount = 0;
 	NDIlib_audio_frame_v2_t audioInput;
 	while (!exit_loop)
 	{
@@ -93,8 +92,6 @@ void NDIAudioTread()
 								 audioInput.no_samples * audioInput.no_channels);
 			
 			audioData.resample(SAMPLE_RATE);
-			resampleCallCount++;
-			std::cout << std::format("resample called {} times.", resampleCallCount) << std::endl;
 
 			// If the portaudio do not know the buffer size, pass it to portAudio output thread.
 			if (bufferSize.load() != audioInput.no_samples)
@@ -126,10 +123,7 @@ static int NDIAudioCallback(const void* inputBuffer,
 	audioDataCondVar.wait(lock, [] { return !audioBufferQueue.empty(); });
 	auto audioSamples = std::move(audioBufferQueue.front());
 	audioBufferQueue.pop();
-
 	audioSamples.diffuse(out, framesPerBuffer);
-	paCallCount++;
-	std::cout << std::format("callback called {} times.\n\n\n", paCallCount) << std::endl;
 
 	return paContinue;
 }
@@ -139,7 +133,7 @@ void portAudioThread()
 	std::signal(SIGINT, sigIntHandler);
 
 	PAErrorCheck(Pa_Initialize());
-	
+	//std::this_thread::sleep_for(std::chrono::seconds(10));
 	PaStream* stream;
 	PAErrorCheck(Pa_OpenDefaultStream(&stream, 0, 2, paFloat32, SAMPLE_RATE, 0, nullptr, nullptr));
 	PAErrorCheck(Pa_StartStream(stream));
