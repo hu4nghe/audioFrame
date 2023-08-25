@@ -34,7 +34,7 @@ public:
 
     // constructor specify the file format without data.
     audioFrame(const int sRate, const int cNum)
-        : sampleRate(sRate), channelNum(cNum) {}
+        : sampleRate(sRate), channelNum(cNum), currentPos(0), audioData() {}
 
     // Copy constructor
     audioFrame(const audioFrame& other)
@@ -45,28 +45,22 @@ public:
     audioFrame(audioFrame&& other) noexcept
         : sampleRate(other.sampleRate), channelNum(other.channelNum),
         audioData(std::move(other.audioData)), currentPos(other.currentPos) {}
-
-    // Move constructor for C style array
     audioFrame(int sampleRate, int channelNum, std::vector<T>&& data) noexcept
         : sampleRate(sampleRate), channelNum(channelNum), audioData(data), currentPos(0) {}
 
     // constructor which takes a C style array as data, an interface with C libraries.
     audioFrame(const int sRate, const int cNum, const T *data, const size_t size)
-        : sampleRate(sRate), channelNum(cNum), currentPos(0)
-    {
-        audioData.assign(data, data + size);
-    }
+        : sampleRate(sRate), channelNum(cNum), currentPos(0), audioData(data, data + size) {}
 
-    inline size_t getSize() { return this->audioData.size(); }
-    inline int getRate() { return this->sampleRate; }
+    inline size_t getSize() { return audioData.size(); }
 
     void readSoundFile(const std::filesystem::path filePath)
     {
         SndfileHandle soundFile(filePath.string(), SFM_READ);
         sampleRate = soundFile.samplerate();
         channelNum = soundFile.channels();
-        audioData.resize(soundFile.frames()* channelNum);
-        soundFile.read(&audioData[0], int(soundFile.frames()* channelNum));
+        audioData.resize(soundFile.frames() * channelNum);
+        soundFile.read(audioData.data(), int(soundFile.frames() * channelNum));
         currentPos = 0;
     }
     
@@ -76,10 +70,10 @@ public:
             return;
         else
         {
-            auto start = std::chrono::high_resolution_clock::now();
-
-            sampleRate = outputSampleRate;
-            T* out = new T[audioData.size() * channelNum];
+            
+            const auto ratio = static_cast<double>(outputSampleRate) / static_cast<double>(sampleRate);
+            const auto outputSize = static_cast<int>(audioData.size() * ratio) + 1;
+            T* out = new T[outputSize];
             
             SRC_STATE* state;
             SRC_DATA data;
@@ -87,43 +81,30 @@ public:
             data.input_frames = audioData.size() / channelNum;
             data.data_in = std::move(audioData.data());
             data.data_out = out;
-            data.src_ratio = static_cast<double>(outputSampleRate) / static_cast<double>(sampleRate);
-            data.output_frames = audioData.size();
+            data.src_ratio = ratio;
+            data.output_frames = outputSize;
 
-            state = src_new(SRC_LINEAR, channelNum, nullptr);
+            state = src_new(SRC_SINC_BEST_QUALITY, channelNum, nullptr);
             if (state == nullptr)
             {
                 std::cout << std::format("Error : Initialisation failed !") << std::endl;
                 exit(EXIT_FAILURE);
             }
-
-            std::cout << "Initialize time : " << std::chrono::duration_cast<std::chrono::microseconds>(std::chrono::high_resolution_clock::now() - start).count() << " microseconds." << std::endl;
-
-            auto start1 = std::chrono::high_resolution_clock::now();
-            src_process(state, &data); 
-            std::cout << "Execution time  : " << std::chrono::duration_cast<std::chrono::microseconds>(std::chrono::high_resolution_clock::now() - start1).count() << " microseconds." << std::endl;
-
-            auto start2 = std::chrono::high_resolution_clock::now();
+            src_process(state, &data);
             audioData.assign(out, out + (data.output_frames_gen)* channelNum);
-            std::cout << "Copy array time : " << std::chrono::duration_cast<std::chrono::microseconds>(std::chrono::high_resolution_clock::now() - start2).count() << " microseconds." << std::endl;
-            
-            auto start3 = std::chrono::high_resolution_clock::now();
-            src_delete(state);    
-            std::cout << "Clean up time   : " << std::chrono::duration_cast<std::chrono::microseconds>(std::chrono::high_resolution_clock::now() - start3).count() << " microseconds." << std::endl;
+            src_delete(state);
+
+            sampleRate = outputSampleRate;
+
         }
     }
 
     void diffuse(T* &out, const size_t framesPerBuffer)
     {
-        auto start = std::chrono::high_resolution_clock::now();
-        
-        
-
         auto posBegin = audioData.begin() + currentPos;
         size_t indexEnd = currentPos + (framesPerBuffer * channelNum);
         size_t endOfAudioLen = 0;
-
-        // Extract current audio data slice
+        // Check if it is the end of audio
         if (indexEnd > audioData.size())
         {
             endOfAudioLen = audioData.end() - posBegin;
@@ -133,10 +114,7 @@ public:
         {
             std::copy(posBegin, posBegin + (framesPerBuffer * channelNum), out);
         }
-        
         currentPos = indexEnd;
-        
-        std::cout << "difuse time     : " << std::chrono::duration_cast<std::chrono::microseconds>(std::chrono::high_resolution_clock::now() - start).count() << " microseconds." << std::endl;
     }    
 };
 

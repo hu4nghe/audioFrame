@@ -27,3 +27,69 @@
        return true;
    }
    */
+
+
+
+//mic, sndfile
+
+/* test : sndfile and microphone input
+static int microphoneAudioCallback( const void* inputBuffer,
+									void* outputBuffer,
+									unsigned long framesPerBuffer,
+									const PaStreamCallbackTimeInfo* timeInfo,
+									PaStreamCallbackFlags statusFlags,
+									void* userData)
+{
+	const auto in = static_cast<const float*>(inputBuffer);
+	auto out = static_cast<float*>(outputBuffer);
+
+	for (int i = 0; i < framesPerBuffer * 2; i++)
+	{
+		out[i] = in[i] * 3;
+	}
+
+	return paContinue;
+}
+
+static int sndfileAudioCallback(const void* inputBuffer,
+								void* outputBuffer,
+								unsigned long framesPerBuffer,
+								const PaStreamCallbackTimeInfo* timeInfo,
+								PaStreamCallbackFlags statusFlags,
+								void* userData)
+{
+	auto out = static_cast<float*>(outputBuffer);
+	SndfileHandle* sndFile = (SndfileHandle*)userData;
+
+	sf_count_t numFramesRead = sndFile->read(out, static_cast<sf_count_t>(framesPerBuffer) * 2);
+	return paContinue;
+}
+*/
+//in pa thread
+/* test : sndfile and microphone input
+	SndfileHandle sndFile("D:/Music/Mahler Symphony No.2/Mahler- Symphony #2 In C Minor, 'Resurrection' - 5g. Mit Aufschwung Aber Nicht Eilen.wav");
+	PaStream* sndfileStream;
+	PAErrorCheck(Pa_OpenDefaultStream(&sndfileStream, 0, 2, paFloat32, SAMPLE_RATE, 128, sndfileAudioCallback, &sndFile));
+	PAErrorCheck(Pa_StartStream(sndfileStream));
+
+
+	PaStream* microStream;
+	PAErrorCheck(Pa_OpenDefaultStream(&microStream, 2, 2, paFloat32, SAMPLE_RATE, 128, microphoneAudioCallback, nullptr));
+	PAErrorCheck(Pa_StartStream(microStream));
+	
+	...
+
+	 test : sndfile and microphone input
+	PAErrorCheck(Pa_StopStream(sndfileStream));
+	PAErrorCheck(Pa_StopStream(microStream));
+	PAErrorCheck(Pa_CloseStream(sndfileStream));
+	PAErrorCheck(Pa_CloseStream(microStream));
+	
+	
+	*/
+
+
+
+//duration check
+	/*auto start = std::chrono::high_resolution_clock::now();
+				std::cout << "Initialize time : " << std::chrono::duration_cast<std::chrono::microseconds>(std::chrono::high_resolution_clock::now() - start).count() << " microseconds." << std::endl;*/

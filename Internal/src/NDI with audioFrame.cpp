@@ -22,6 +22,8 @@ std::queue<audioFrame<float>> audioBufferQueue;
 std::atomic<bool> bufferSizeChanged(false);
 std::atomic <size_t> bufferSize(0);
 
+int paCallCount = 0;
+
 void PAErrorCheck(PaError err)
 {
 	if (err != paNoError)
@@ -72,12 +74,12 @@ void NDIAudioTread()
 	NDIlib_find_destroy(pNDIFind);
 
 	// NDI data capture loop
+	int resampleCallCount = 0;
 	NDIlib_audio_frame_v2_t audioInput;
 	while (!exit_loop)
 	{
 		// Capture NDI data
 		auto NDI_frame_type = NDIlib_recv_capture_v2(pNDI_recv, nullptr, &audioInput, nullptr, 1000);
-
 		if (NDI_frame_type == NDIlib_frame_type_audio)
 		{
 			// Create a NDI audio object and convert it to interleaved float format.
@@ -91,6 +93,8 @@ void NDIAudioTread()
 								 audioInput.no_samples * audioInput.no_channels);
 			
 			audioData.resample(SAMPLE_RATE);
+			resampleCallCount++;
+			std::cout << std::format("resample called {} times.", resampleCallCount) << std::endl;
 
 			// If the portaudio do not know the buffer size, pass it to portAudio output thread.
 			if (bufferSize.load() != audioInput.no_samples)
@@ -110,105 +114,48 @@ void NDIAudioTread()
 }
 
 static int NDIAudioCallback(const void* inputBuffer, 
-						 void* outputBuffer,
-						 unsigned long framesPerBuffer,
-						 const PaStreamCallbackTimeInfo* timeInfo,
-						 PaStreamCallbackFlags statusFlags,
-						 void* userData)
+							void* outputBuffer,
+							unsigned long framesPerBuffer,
+							const PaStreamCallbackTimeInfo* timeInfo,
+							PaStreamCallbackFlags statusFlags,
+							void* userData)
 {
 	auto out = static_cast<float*>(outputBuffer);
 
-	//Wait NDI thread push audio data into the queue
 	std::unique_lock<std::mutex> lock(audioDataMtx);
 	audioDataCondVar.wait(lock, [] { return !audioBufferQueue.empty(); });
-
-	//Get data from the queue.
 	auto audioSamples = std::move(audioBufferQueue.front());
 	audioBufferQueue.pop();
-	//std::cout << std::format("queue element count:{} ", audioBufferQueue.size()) << std::endl;
-	//Copy data to portaudio output stream.
+
 	audioSamples.diffuse(out, framesPerBuffer);
+	paCallCount++;
+	std::cout << std::format("callback called {} times.\n\n\n", paCallCount) << std::endl;
 
 	return paContinue;
 }
-/* test : sndfile and microphone input
-static int microphoneAudioCallback( const void* inputBuffer,
-									void* outputBuffer,
-									unsigned long framesPerBuffer,
-									const PaStreamCallbackTimeInfo* timeInfo,
-									PaStreamCallbackFlags statusFlags,
-									void* userData)
-{
-	const auto in = static_cast<const float*>(inputBuffer);
-	auto out = static_cast<float*>(outputBuffer);
-
-	for (int i = 0; i < framesPerBuffer * 2; i++)
-	{
-		out[i] = in[i] * 3;
-	}
-
-	return paContinue;
-}
-
-static int sndfileAudioCallback(const void* inputBuffer,
-								void* outputBuffer,
-								unsigned long framesPerBuffer,
-								const PaStreamCallbackTimeInfo* timeInfo,
-								PaStreamCallbackFlags statusFlags,
-								void* userData)
-{
-	auto out = static_cast<float*>(outputBuffer);
-	SndfileHandle* sndFile = (SndfileHandle*)userData;
-
-	sf_count_t numFramesRead = sndFile->read(out, static_cast<sf_count_t>(framesPerBuffer) * 2);
-	return paContinue;
-}
-*/
 
 void portAudioThread()
 {
 	std::signal(SIGINT, sigIntHandler);
 
 	PAErrorCheck(Pa_Initialize());
-	/* test : sndfile and microphone input
-	SndfileHandle sndFile("D:/Music/Mahler Symphony No.2/Mahler- Symphony #2 In C Minor, 'Resurrection' - 5g. Mit Aufschwung Aber Nicht Eilen.wav");
-	PaStream* sndfileStream;
-	PAErrorCheck(Pa_OpenDefaultStream(&sndfileStream, 0, 2, paFloat32, SAMPLE_RATE, 128, sndfileAudioCallback, &sndFile));
-	PAErrorCheck(Pa_StartStream(sndfileStream));
 	
-
-	PaStream* microStream;
-	PAErrorCheck(Pa_OpenDefaultStream(&microStream, 2, 2, paFloat32, SAMPLE_RATE, 128, microphoneAudioCallback, nullptr));
-	PAErrorCheck(Pa_StartStream(microStream));
-	*/
 	PaStream* stream;
-	PAErrorCheck(Pa_OpenDefaultStream(&stream, 0, 2, paFloat32, 44100, 0, nullptr, nullptr));
+	PAErrorCheck(Pa_OpenDefaultStream(&stream, 0, 2, paFloat32, SAMPLE_RATE, 0, nullptr, nullptr));
 	PAErrorCheck(Pa_StartStream(stream));
 
 	while (!exit_loop)
 	{
-		if (Pa_IsStreamActive(stream))
+		if (Pa_IsStreamActive(stream) && bufferSizeChanged.exchange(false))
 		{
-			if (bufferSizeChanged.exchange(false))
-			{
-				int newBufferSize = bufferSize.load();
-				PAErrorCheck(Pa_AbortStream(stream));
-				PAErrorCheck(Pa_OpenDefaultStream(&stream, 2, 2, paFloat32, 48000, newBufferSize, NDIAudioCallback, nullptr));
-				PAErrorCheck(Pa_StartStream(stream));
-			}
-			
-				
-		}
+			int newBufferSize = bufferSize.load();
+			PAErrorCheck(Pa_AbortStream(stream));
+			PAErrorCheck(Pa_OpenDefaultStream(&stream, 2, 2, paFloat32, SAMPLE_RATE, newBufferSize, NDIAudioCallback, nullptr));
+			PAErrorCheck(Pa_StartStream(stream));
+		}	
 	}
-	/* test : sndfile and microphone input
-	PAErrorCheck(Pa_StopStream(sndfileStream));	
-	PAErrorCheck(Pa_StopStream(microStream));
-	PAErrorCheck(Pa_CloseStream(sndfileStream));
-	PAErrorCheck(Pa_CloseStream(microStream));
-	*/
 	PAErrorCheck(Pa_StopStream(stream));
 	PAErrorCheck(Pa_CloseStream(stream));
-	
 	PAErrorCheck(Pa_Terminate());
 }
 
