@@ -1,14 +1,16 @@
 ﻿#include <atomic>
 #include <condition_variable>
-#include <csignal>
-#include <thread>
 #include <mutex>
+#include <thread>
+
+#include <csignal>
+
 #include <queue>
 
 #include "Processing.NDI.Lib.h" 
 #include "audioFrame.h"
 
-constexpr auto SAMPLE_RATE = 48000;
+constexpr auto SAMPLE_RATE = 96000;
 
 // System signal catch handler
 static std::atomic<bool> exit_loop(false);
@@ -91,12 +93,12 @@ void NDIAudioTread()
 								 std::move(audio_frame_32bpp_interleaved.p_data), 
 								 audioInput.no_samples * audioInput.no_channels);
 			
-			audioData.resample(SAMPLE_RATE);
+			int newBufferSize = audioData.resample(SAMPLE_RATE);
 
 			// If the portaudio do not know the buffer size, pass it to portAudio output thread.
-			if (bufferSize.load() != audioInput.no_samples)
+			if (bufferSize.load() != newBufferSize)
 			{
-				bufferSize.store(audioInput.no_samples);
+				bufferSize.store(newBufferSize);
 				bufferSizeChanged.store(true);
 			}
 
@@ -146,6 +148,10 @@ void portAudioThread()
 			PAErrorCheck(Pa_AbortStream(stream));
 			PAErrorCheck(Pa_OpenDefaultStream(&stream, 2, 2, paFloat32, SAMPLE_RATE, newBufferSize, NDIAudioCallback, nullptr));
 			PAErrorCheck(Pa_StartStream(stream));
+			std::cout << std::format("PortAudio set :\n"
+									 "Sample rate : {}\n"
+									 "Buffer size : {}\n",
+									 SAMPLE_RATE, newBufferSize);
 		}	
 	}
 	PAErrorCheck(Pa_StopStream(stream));

@@ -11,9 +11,6 @@
 #include <memory>
 #include <type_traits>
 
-#include <atomic>
-#include <thread>
-
 #include "portaudio.h"
 #include "sndfile.hh"
 #include "samplerate.h"
@@ -64,20 +61,21 @@ public:
         currentPos = 0;
     }
     
-    void resample(const int outputSampleRate)
+    int resample(const int outputSampleRate)
     {
         if (outputSampleRate == sampleRate)
-            return;
+            return audioData.size();
         else
         {
-            
+            auto start = std::chrono::high_resolution_clock::now();
+
             const auto ratio = static_cast<double>(outputSampleRate) / static_cast<double>(sampleRate);
-            const auto outputSize = static_cast<int>(audioData.size() * ratio) + 1;
+            const auto outputSize = static_cast<int>(audioData.size() * ratio);
             T* out = new T[outputSize];
             
             SRC_STATE* state;
             SRC_DATA data;
-            std::cout << std::format("Input frame : {}; Output frame : {}", audioData.size() / channelNum ,outputSize) << std::endl;
+            
             data.end_of_input = false;
             data.input_frames = audioData.size() / channelNum;
             data.data_in = std::move(audioData.data());
@@ -86,23 +84,34 @@ public:
             data.output_frames = outputSize;
 
             state = src_new(SRC_SINC_BEST_QUALITY, channelNum, nullptr);
+            
             if (state == nullptr)
             {
                 std::cout << std::format("Error : Initialisation failed !") << std::endl;
                 exit(EXIT_FAILURE);
             }
+            std::cout << "Preparation time : " << std::chrono::duration_cast<std::chrono::microseconds>(std::chrono::high_resolution_clock::now() - start).count() << " microseconds." << std::endl;
+
+            auto start1 = std::chrono::high_resolution_clock::now();
             src_process(state, &data);
-            std::cout << std::format("Input frame used : {}; Output frame gen : {}", data.input_frames_used, data.output_frames_gen) << std::endl;
+            std::cout << "Resample time    : " << std::chrono::duration_cast<std::chrono::microseconds>(std::chrono::high_resolution_clock::now() - start1).count() << " microseconds." << std::endl;
+            
+            auto start2 = std::chrono::high_resolution_clock::now();
             audioData.assign(out, out + (data.output_frames_gen)* channelNum);
+            std::cout << "Data Copy time   : " << std::chrono::duration_cast<std::chrono::microseconds>(std::chrono::high_resolution_clock::now() - start2).count() << " microseconds.\n" << std::endl;
+            
             src_delete(state);
-
+            
+            
             sampleRate = outputSampleRate;
-
+            return data.output_frames_gen;
         }
     }
 
     void diffuse(T* &out, const size_t framesPerBuffer)
     {
+        auto start = std::chrono::high_resolution_clock::now();
+
         auto posBegin = audioData.begin() + currentPos;
         size_t indexEnd = currentPos + (framesPerBuffer * channelNum);
         size_t endOfAudioLen = 0;
@@ -117,6 +126,8 @@ public:
             std::copy(posBegin, posBegin + (framesPerBuffer * channelNum), out);
         }
         currentPos = indexEnd;
+
+        std::cout << "Difusion time    : " << std::chrono::duration_cast<std::chrono::microseconds>(std::chrono::high_resolution_clock::now() - start).count() << " microseconds.\n" << std::endl;
     }    
 };
 
