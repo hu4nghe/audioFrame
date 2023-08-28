@@ -3,7 +3,7 @@
 #include "audioFrame.h"
 
 #define PA_SAMPLE_TYPE paFloat32
-constexpr auto PA_BUFFER_SIZE = 64;
+constexpr auto PA_BUFFER_SIZE = 512;
 
 static int NDIAudioCallback(const void* inputBuffer,
                             void* outputBuffer,
@@ -14,7 +14,7 @@ static int NDIAudioCallback(const void* inputBuffer,
 {
     auto out = static_cast<float*>(outputBuffer);
     auto sndFile = static_cast<audioFrame<float>*>(userData);      
-    std::cout << "framesPerBuffer" << framesPerBuffer<<std::endl;
+    std::cout << "elements in the queue : " << sndFile->getSize()<<std::endl;
     
     std::vector<float> temp;
     const int size = sndFile->pop(temp, framesPerBuffer);
