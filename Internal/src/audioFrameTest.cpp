@@ -14,13 +14,14 @@ static int NDIAudioCallback(const void* inputBuffer,
 {
     auto out = static_cast<float*>(outputBuffer);
     auto sndFile = static_cast<audioFrame<float>*>(userData);      
-    std::cout << "portaudio called;" << std::endl;
-    auto vec(framesPerBuffer);
+    std::cout << "framesPerBuffer" << framesPerBuffer<<std::endl;
+    
     std::vector<float> temp;
-    const int size = sndFile->pop(temp , framesPerBuffer);
-    auto tempPtr = std::make_unique<float>(size);
-    std::copy(temp.begin(), temp.end(), tempPtr.get());
-    out = tempPtr.get();
+    const int size = sndFile->pop(temp, framesPerBuffer);
+    
+    
+    std::copy(temp.begin(), temp.end(), out);
+    
     return paContinue;
 }
 
@@ -35,7 +36,7 @@ int main()
     // Set up PortAudio stream and start
     error_check(Pa_Initialize());
     PaStream* stream;
-    error_check(Pa_OpenDefaultStream(&stream, 0, 2, PA_SAMPLE_TYPE, 44100, PA_BUFFER_SIZE, NDIAudioCallback, &input));
+    error_check(Pa_OpenDefaultStream(&stream, 0, 2, PA_SAMPLE_TYPE, 44100, 2205, NDIAudioCallback, &input));
     error_check(Pa_StartStream(stream));
 
     std::cout << "Playing..." << std::endl;

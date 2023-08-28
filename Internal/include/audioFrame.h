@@ -37,10 +37,8 @@ public:
     void push(const T* data, size_t size)
     {
         std::lock_guard<std::mutex> lock(mtx);
-        for (size_t i = 0; i < size; ++i) 
-        {
+        for (size_t i = 0; i < size; ++i)
             audioData.push(data[i]);
-        }
     }
 
     size_t pop(std::vector<T> &ptr, size_t maxElements) 
@@ -50,7 +48,7 @@ public:
         size_t poppedCount = 0;
         while (poppedCount < maxElements && !audioData.empty())
         {
-            output[poppedCount] = std::move(audioData.front());
+            output[poppedCount] = (std::move(audioData.front()));
             audioData.pop();
             poppedCount++;
         }
@@ -59,7 +57,6 @@ public:
 
         return poppedCount;
     }
-    
 
     inline size_t getSize() { return audioData.size(); }
 
