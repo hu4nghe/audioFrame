@@ -33,8 +33,6 @@ void PAErrorCheck(PaError err)
 	}
 }
 
-
-
 void NDIAudioTread()
 {
 	std::signal(SIGINT, sigIntHandler);
@@ -83,29 +81,16 @@ void NDIAudioTread()
 		auto NDI_frame_type = NDIlib_recv_capture_v2(pNDI_recv, nullptr, &audioInput, nullptr, 1000);
 		if (NDI_frame_type == NDIlib_frame_type_audio)
 		{
+			const size_t dataSize = audioInput.no_samples * audioInput.no_channels;
+
 			// Create a NDI audio object and convert it to interleaved float format.
 			NDIlib_audio_frame_interleaved_32f_t audio_frame_32bpp_interleaved;
-			audio_frame_32bpp_interleaved.p_data = new float[audioInput.no_samples * audioInput.no_channels];
+			audio_frame_32bpp_interleaved.p_data = new float[dataSize];
 			NDIlib_util_audio_to_interleaved_32f_v2(&audioInput, &audio_frame_32bpp_interleaved);
 
-			audioFrame audioData(audioInput.sample_rate, 
-								 audioInput.no_channels,
-								 std::move(audio_frame_32bpp_interleaved.p_data), 
-								 audioInput.no_samples * audioInput.no_channels);
-			
-			int newBufferSize = audioData.resample(SAMPLE_RATE);
+			audioFrame<float> audioData(audioInput.sample_rate, audioInput.no_channels);
+			audioData.push(audio_frame_32bpp_interleaved.p_data, dataSize);
 
-			// If the portaudio do not know the buffer size, pass it to portAudio output thread.
-			if (bufferSize.load() != newBufferSize)
-			{
-				bufferSize.store(newBufferSize);
-				bufferSizeChanged.store(true);
-			}
-
-			// Transfer the ownership of audio data and push it into the queue.
-			std::lock_guard<std::mutex> lock(audioDataMtx);
-			audioBufferQueue.push(std::move(audioData));
-			audioDataCondVar.notify_one();
 		}
 	}
 	NDIlib_recv_destroy(pNDI_recv);

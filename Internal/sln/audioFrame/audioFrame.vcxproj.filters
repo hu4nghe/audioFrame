@@ -18,15 +18,9 @@
     <ClInclude Include="..\..\include\audioFrame.h">
       <Filter>头文件</Filter>
     </ClInclude>
-    <ClInclude Include="sample.h">
-      <Filter>头文件</Filter>
-    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="..\..\src\audioFrame.cpp">
-      <Filter>源文件</Filter>
-    </ClCompile>
-    <ClCompile Include="sample.cpp">
       <Filter>源文件</Filter>
     </ClCompile>
   </ItemGroup>

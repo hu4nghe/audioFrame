@@ -8,11 +8,9 @@
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="..\..\include\audioFrame.h" />
-    <ClInclude Include="sample.h" />
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="..\..\src\audioFrame.cpp" />
-    <ClCompile Include="sample.cpp" />
   </ItemGroup>
   <PropertyGroup Label="Globals">
     <VCProjectVersion>16.0</VCProjectVersion>
