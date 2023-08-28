@@ -10,28 +10,15 @@
 #include "Processing.NDI.Lib.h" 
 #include "audioFrame.h"
 
-constexpr auto SAMPLE_RATE = 96000;
+constexpr auto SAMPLE_RATE = 44100;
 
 // System signal catch handler
 static std::atomic<bool> exit_loop(false);
 static void sigIntHandler(int) { exit_loop = true; }
 
-//Global variables for multi-thread communication.
-std::mutex audioDataMtx;
-std::condition_variable audioDataCondVar;
-std::queue<audioFrame<float>> audioBufferQueue;
+audioQueue<float> data(2147483648);
 
-std::atomic<bool> bufferSizeChanged(false);
-std::atomic <size_t> bufferSize(0);
-
-void PAErrorCheck(PaError err)
-{
-	if (err != paNoError)
-	{
-		std::cout << std::format("PortAudio error : {}.", Pa_GetErrorText(err)) << std::endl;
-		exit(EXIT_FAILURE);
-	}
-}
+inline void PAErrorCheck(PaError err){if (err != paNoError){ std::print("PortAudio error : {}.\n", Pa_GetErrorText(err)); exit(EXIT_FAILURE);}}
 
 void NDIAudioTread()
 {
@@ -44,7 +31,7 @@ void NDIAudioTread()
 	auto pNDIFind = NDIlib_find_create_v2(&NDIFindCreateDesc);
 	if (pNDIFind == nullptr)
 	{
-		std::cout << std::format("Error : Unable to create NDI finder.") << std::endl;
+		std::print("Error : Unable to create NDI finder.\n");
 		return;
 	}
 	unsigned int noSources = 0;
@@ -56,7 +43,7 @@ void NDIAudioTread()
 	}
 	if (pSources == nullptr)
 	{
-		std::cout << std::format("Error : No source available!.") << std::endl;
+		std::print("Error : No source available!.\n");
 		return;
 	}
 
@@ -67,7 +54,7 @@ void NDIAudioTread()
 	auto pNDI_recv = NDIlib_recv_create_v3(&NDIRecvCreateDesc);
 	if (pNDI_recv == nullptr)
 	{
-		std::cout << std::format("Error : Unable to create NDI receiver.") << std::endl;
+		std::print("Error : Unable to create NDI receiver.\n");
 		NDIlib_find_destroy(pNDIFind);
 		return;
 	}
@@ -88,9 +75,12 @@ void NDIAudioTread()
 			audio_frame_32bpp_interleaved.p_data = new float[dataSize];
 			NDIlib_util_audio_to_interleaved_32f_v2(&audioInput, &audio_frame_32bpp_interleaved);
 
-			audioFrame<float> audioData(audioInput.sample_rate, audioInput.no_channels);
-			audioData.push(audio_frame_32bpp_interleaved.p_data, dataSize);
-
+			data.setChannelNum(audioInput.no_channels);
+			data.setSampleRate(audioInput.no_samples);
+			data.push(audio_frame_32bpp_interleaved.p_data, dataSize);
+			delete[] audio_frame_32bpp_interleaved.p_data;
+			audio_frame_32bpp_interleaved.p_data = nullptr;
+			std::cout<< "NDI : there are " << data.getsize() <<" element in the queue.\n";
 		}
 	}
 	NDIlib_recv_destroy(pNDI_recv);
@@ -105,12 +95,7 @@ static int NDIAudioCallback(const void* inputBuffer,
 							void* userData)
 {
 	auto out = static_cast<float*>(outputBuffer);
-
-	std::unique_lock<std::mutex> lock(audioDataMtx);
-	audioDataCondVar.wait(lock, [] { return !audioBufferQueue.empty(); });
-	auto audioSamples = std::move(audioBufferQueue.front());
-	audioBufferQueue.pop();
-	audioSamples.diffuse(out, framesPerBuffer);
+	data.pop(out, framesPerBuffer);
 
 	return paContinue;
 }
@@ -120,24 +105,14 @@ void portAudioThread()
 	std::signal(SIGINT, sigIntHandler);
 
 	PAErrorCheck(Pa_Initialize());
-	//std::this_thread::sleep_for(std::chrono::seconds(10));
+	std::this_thread::sleep_for(std::chrono::seconds(10));
 	PaStream* stream;
-	PAErrorCheck(Pa_OpenDefaultStream(&stream, 0, 2, paFloat32, SAMPLE_RATE, 0, nullptr, nullptr));
+	PAErrorCheck(Pa_OpenDefaultStream(&stream, 0, 2, paFloat32, SAMPLE_RATE, 512, NDIAudioCallback, nullptr));
 	PAErrorCheck(Pa_StartStream(stream));
 
 	while (!exit_loop)
 	{
-		if (Pa_IsStreamActive(stream) && bufferSizeChanged.exchange(false))
-		{
-			int newBufferSize = bufferSize.load();
-			PAErrorCheck(Pa_AbortStream(stream));
-			PAErrorCheck(Pa_OpenDefaultStream(&stream, 2, 2, paFloat32, SAMPLE_RATE, newBufferSize, NDIAudioCallback, nullptr));
-			PAErrorCheck(Pa_StartStream(stream));
-			std::cout << std::format("PortAudio set :\n"
-									 "Sample rate : {}\n"
-									 "Buffer size : {}\n",
-									 SAMPLE_RATE, newBufferSize);
-		}	
+		
 	}
 	PAErrorCheck(Pa_StopStream(stream));
 	PAErrorCheck(Pa_CloseStream(stream));

@@ -32,7 +32,7 @@ void PAErrorCheck(PaError err)
 {
 	if (err != paNoError)
 	{
-		std::cout << std::format("PortAudio error : {}.", Pa_GetErrorText(err)) << std::endl;
+		std::print("PortAudio error : {}.", Pa_GetErrorText(err)) << std::endl;
 		exit(EXIT_FAILURE);
 	}
 }
@@ -48,7 +48,7 @@ void NDIAudioTread()
 	auto pNDIFind = NDIlib_find_create_v2(&NDIFindCreateDesc);
 	if (pNDIFind == nullptr)
 	{
-		std::cout << std::format("Error : Unable to create NDI finder.") << std::endl;
+		std::print("Error : Unable to create NDI finder.\n");
 		return;
 	}
 	unsigned int noSources = 0;
@@ -60,7 +60,7 @@ void NDIAudioTread()
 	}
 	if (pSources == nullptr)
 	{
-		std::cout << std::format("Error : No source available!.") << std::endl;
+		std::print("Error : No source available!.\n");
 		return;
 	}
 
@@ -71,7 +71,7 @@ void NDIAudioTread()
 	auto pNDI_recv = NDIlib_recv_create_v3(&NDIRecvCreateDesc);
 	if (pNDI_recv == nullptr)
 	{
-		std::cout << std::format("Error : Unable to create NDI receiver.") << std::endl;
+		std::print("Error : Unable to create NDI receiver.\n");
 		NDIlib_find_destroy(pNDIFind);
 		return;
 	}
@@ -90,10 +90,10 @@ void NDIAudioTread()
 		if (NDI_frame_type == NDIlib_frame_type_audio)
 		{
 			// If the portaudio do not know the buffer size, pass it to portAudio output thread.
-			//std::cout << std::format("NDIAudioThread : current sample number is {} and source sample number is {}\n", currentSampleNum, audioFrame.no_samples) << std::endl;
+			//std::print("NDIAudioThread : current sample number is {} and source sample number is {}\n", currentSampleNum, audioFrame.no_samples) << std::endl;
 			if (currentSampleNum != audioFrame.no_samples)
 			{
-				//std::cout << std::format("NDIAudioThread : Buffer size change mecanism triggered in NDI thread main !\n") << std::endl;
+				//std::print("NDIAudioThread : Buffer size change mecanism triggered in NDI thread main !\n\n");
 				currentSampleNum = audioFrame.no_samples;
 				std::unique_lock<std::mutex> lock(bufferSizeMtx);
 				bufferSize = audioFrame.no_samples;
@@ -127,7 +127,7 @@ static int NDIAudioCallback(const void* inputBuffer,
 						 PaStreamCallbackFlags statusFlags,
 						 void* userData)
 {
-	//std::cout << std::format("portAudioThread : Buffer size is {}", framesPerBuffer) << std::endl;
+	//std::print("portAudioThread : Buffer size is {}", framesPerBuffer) << std::endl;
 	auto out = static_cast<float*>(outputBuffer);
 
 	//Wait NDI thread push audio data into the queue
@@ -141,7 +141,7 @@ static int NDIAudioCallback(const void* inputBuffer,
 	//Copy data to portaudio output stream.
 	std::copy(audioSamples.get(), audioSamples.get() + framesPerBuffer * 2, out);
 
-	//std::cout << std::format("portAudioThread : Buffer size is {}, Callback normally called {} times.", framesPerBuffer, callbackCount) << std::endl;
+	//std::print("portAudioThread : Buffer size is {}, Callback normally called {} times.", framesPerBuffer, callbackCount) << std::endl;
 
 	return paContinue;
 
@@ -154,16 +154,16 @@ void portAudioThread()
 	//open a default stream at the start
 	PaStream* stream;
 	PAErrorCheck(Pa_OpenDefaultStream(&stream, 0, 2, paFloat32, SAMPLE_RATE, 0, nullptr, nullptr));
-	std::cout << std::format("Steam set !") << std::endl;
+	std::print("Steam set !\n");
 
 	PAErrorCheck(Pa_StartStream(stream));
-	std::cout << std::format("Stream started !") << std::endl;
+	std::print("Stream started !\n");
 
 	while (1)
 	{
 		if (Pa_IsStreamActive(stream))
 		{
-			//std::cout << std::format("portAudioThread : Buffer size change mecanism triggered in PA thread main") << std::endl;
+			//std::print("portAudioThread : Buffer size change mecanism triggered in PA thread main\n");
 			std::unique_lock<std::mutex> lock(bufferSizeMtx);
 			bufferSizeCondVar.wait(lock, [] { return bufferSizeChanged; });
 			bufferSizeChanged = false;
@@ -171,11 +171,11 @@ void portAudioThread()
 			int newBufferSize = bufferSize;
 			lock.unlock();
 			PAErrorCheck(Pa_StopStream(stream));
-			//std::cout << std::format("portAudioThread : new buffer to setup stream is {}.",newBufferSize) << std::endl;
+			//std::print("portAudioThread : new buffer to setup stream is {}.",newBufferSize) << std::endl;
 			PAErrorCheck(Pa_OpenDefaultStream(&stream, 0, 2, paFloat32, SAMPLE_RATE, newBufferSize, NDIAudioCallback, nullptr));
-			//std::cout << std::format("portAudioThread : Pa_Stream Reset") << std::endl;
+			//std::print("portAudioThread : Pa_Stream Reset\n");
 			PAErrorCheck(Pa_StartStream(stream));
-			//std::cout << std::format("portAudioThread : Pa_Stream Restart") << std::endl;
+			//std::print("portAudioThread : Pa_Stream Restart\n");
 			//if (Pa_IsStreamActive(stream)) std::cout << "portAudioThread : restart sucess" << std::endl;
 		}
 	}
