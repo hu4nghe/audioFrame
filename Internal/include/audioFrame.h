@@ -48,7 +48,7 @@ public:
 };
 
 template<typename T, typename U>
-inline      audioQueue<T, U>::audioQueue(const size_t initialCapacity)
+inline audioQueue<T, U>::audioQueue(const size_t initialCapacity)
     : capacity(initialCapacity), queue(capacity), head(0), tail(0), audioSampleRate(0), channelNum(0), elementCount(0) {}
 
 template<typename T, typename U>
