@@ -52,7 +52,7 @@ inline      audioQueue<T, U>::audioQueue(const size_t initialCapacity)
     : capacity(initialCapacity), queue(capacity), head(0), tail(0), audioSampleRate(0), channelNum(0), elementCount(0) {}
 
 template<typename T, typename U>
-inline bool audioQueue<T,U>::enqueue(const T& value)
+bool audioQueue<T,U>::enqueue(const T& value)
 {
     size_t currentTail = tail.load(std::memory_order_relaxed);
     size_t nextTail = (currentTail + 1) % capacity;
@@ -67,7 +67,7 @@ inline bool audioQueue<T,U>::enqueue(const T& value)
 }
 
 template<typename T, typename U >
-inline bool audioQueue<T,U>::dequeue(T& value)
+bool audioQueue<T,U>::dequeue(T& value)
 {
     size_t currentHead = head.load(std::memory_order_relaxed);
 
@@ -92,7 +92,7 @@ inline bool audioQueue<T,U>::isDefault(T value)
 }
 
 template<typename T, typename U>
-inline bool audioQueue<T,U>::push(const T* ptr, size_t frames)
+bool audioQueue<T,U>::push(const T* ptr, size_t frames)
 {
     size_t size = frames * channelNum;
     for (auto i = 0; i < size; i++)
@@ -107,7 +107,7 @@ inline bool audioQueue<T,U>::push(const T* ptr, size_t frames)
 }
 
 template<typename T, typename U>
-inline void audioQueue<T,U>::pop(T*& ptr, size_t frames)
+void audioQueue<T,U>::pop(T*& ptr, size_t frames)
 {
     size_t size = frames * channelNum;
     if (size > elementCount.load())
@@ -121,7 +121,7 @@ inline void audioQueue<T,U>::pop(T*& ptr, size_t frames)
 
 template<typename T, typename U>
 inline bool audioQueue<T,U>::setCapacity(size_t newCapacity)
-{
+{   
     if (this->empty())
     {
         queue.resize(newCapacity);
@@ -133,4 +133,5 @@ inline bool audioQueue<T,U>::setCapacity(size_t newCapacity)
         return false;
     }
 }
+
 #endif// audioQueue_H
