@@ -11,7 +11,8 @@
 #include "audioFrame.h"
 
 constexpr auto SAMPLE_RATE = 44100;
-audioQueue<float> data(2147483648);
+constexpr auto PA_BUFFER_SIZE = 128;
+audioQueue<float> data(20000);
 
 // System signal catch handler
 static std::atomic<bool> exit_loop(false);
@@ -84,7 +85,7 @@ void NDIAudioTread()
 
 			delete[] audioDataNDI.p_data;
 
-			std::print("NDI : {} sample pushed and there are {} element in the queue.\n", audioInput.no_samples, data.size());
+			std::print("							NDI : {} sample pushed,{} sample in the queue.\n", audioInput.no_samples, data.size());
 		}
 	}
 
@@ -97,42 +98,41 @@ void NDIAudioTread()
 	///////////////////////////////////////////////////////////////////////////////////////////////////////////////
 }
 
-static int NDIAudioCallback(const void* inputBuffer, 
-							void* outputBuffer,
-							unsigned long framesPerBuffer,
-							const PaStreamCallbackTimeInfo* timeInfo,
-							PaStreamCallbackFlags statusFlags,
-							void* userData)
+static int portAudioOutputCallback( const void* inputBuffer, 
+									void* outputBuffer,
+									unsigned long framesPerBuffer,
+									const PaStreamCallbackTimeInfo* timeInfo,
+									PaStreamCallbackFlags statusFlags,
+									void* userData)
 {
-	
 	auto out = static_cast<float*>(outputBuffer);
 	data.pop(out, framesPerBuffer);
-	std::print("PA  : {} sample poped  and there are {} element in the queue.\n", framesPerBuffer, data.size());
+	std::print("PA out :{} sample poped, {} sample in the queue.\n", framesPerBuffer, data.size());
 	return paContinue;
 }
 
-void portAudioThread()
+void portAudioOutputThread()
 {
 	std::signal(SIGINT, sigIntHandler);
 
 	PAErrorCheck(Pa_Initialize());
-	PaStream* stream;
-	PAErrorCheck(Pa_OpenDefaultStream(&stream, 0, 2, paFloat32, SAMPLE_RATE, 1024, NDIAudioCallback, nullptr));
-	PAErrorCheck(Pa_StartStream(stream));
+	PaStream* streamOut;
+	PAErrorCheck(Pa_OpenDefaultStream(&streamOut, 2, 2, paFloat32, SAMPLE_RATE, PA_BUFFER_SIZE, portAudioOutputCallback, nullptr));
+	PAErrorCheck(Pa_StartStream(streamOut));
 	std::print("playing...\n");
 	while (!exit_loop){}
-	PAErrorCheck(Pa_StopStream(stream));
-	PAErrorCheck(Pa_CloseStream(stream));
+	PAErrorCheck(Pa_StopStream(streamOut));
+	PAErrorCheck(Pa_CloseStream(streamOut));
 	PAErrorCheck(Pa_Terminate());
 }
 
 int main()
 {
 	std::thread ndiThread(NDIAudioTread);
-	std::thread ndiPortaudio(portAudioThread);
+	std::thread portaudio(portAudioOutputThread);
 
 	ndiThread.detach();
-	ndiPortaudio.join();
-	                  
+	portaudio.join();
+	                 
 	return 0;
 }

@@ -93,3 +93,9 @@ static int sndfileAudioCallback(const void* inputBuffer,
 //duration check
 	/*auto start = std::chrono::high_resolution_clock::now();
 				std::cout << "Initialize time : " << std::chrono::duration_cast<std::chrono::microseconds>(std::chrono::high_resolution_clock::now() - start).count() << " microseconds." << std::endl;*/
+
+/*template <typename T>
+void NDIErrorCheck(T* ptr)
+{
+
+}*/

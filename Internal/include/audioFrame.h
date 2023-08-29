@@ -12,14 +12,14 @@ template <typename T,
 class audioQueue 
 {
 private:
+                size_t  audioSampleRate;
+                size_t  channelNum;
+              //uint8_t volume;
+                size_t  capacity;
+
     std::atomic<size_t> elementCount;
     std::atomic<size_t> head;
     std::atomic<size_t> tail;
-
-                size_t  capacity;
-                size_t  sampleRate;
-                size_t  channelNum;
-
     std::vector<T>      queue;
 
                  bool   enqueue         (const T& value);
@@ -28,26 +28,28 @@ private:
 
 public:
                         audioQueue      () = default;
-                        audioQueue      (size_t size);
-    //configurations
-    inline       void   setSampleRate   (const size_t sRate){ sampleRate = sRate; }
+                        audioQueue      (const size_t initialCapacity);
+
+                 bool   push            (const T*  ptr, size_t frames);
+                 void   pop             (      T* &ptr, size_t frames);
+
+      //audioQueue<T>   operator+       (const audioQueue<T> other);
+
+    inline       void   setSampleRate   (const size_t sRate){ audioSampleRate = sRate; }
     inline       void   setChannelNum   (const size_t cNum ){ channelNum = cNum; }
                  bool   setCapacity     (const size_t newCapacity);
-    //getters
+               //void   setVolume       (const uint8_t volume);
+
     inline     size_t   channels        () const { return channelNum; }
-    inline     size_t   audioSampleRate () const { return sampleRate; }
+    inline     size_t   sampleRate      () const { return audioSampleRate; }
     inline     size_t   size            () const { return elementCount.load(); }
-
-                 bool   push            (const T*     ptr, size_t frames);
-                 void   pop             (      T*&    ptr, size_t frames);
-                 
-
+    inline       bool   empty           () const { return std::all_of(queue.begin(), queue.end(), &audioQueue::isDefault);}
     
 };
 
 template<typename T, typename U>
-inline      audioQueue<T, U>::audioQueue(size_t size)
-    : capacity(size), queue(capacity), head(0), tail(0), sampleRate(0), channelNum(0), elementCount(0) {}
+inline      audioQueue<T, U>::audioQueue(const size_t initialCapacity)
+    : capacity(initialCapacity), queue(capacity), head(0), tail(0), audioSampleRate(0), channelNum(0), elementCount(0) {}
 
 template<typename T, typename U>
 inline bool audioQueue<T,U>::enqueue(const T& value)
@@ -120,8 +122,7 @@ inline void audioQueue<T,U>::pop(T*& ptr, size_t frames)
 template<typename T, typename U>
 inline bool audioQueue<T,U>::setCapacity(size_t newCapacity)
 {
-    bool emptyCheck = std::all_of(queue.begin(), queue.end(), &audioQueue::isDefault);
-    if (emptyCheck)
+    if (this->empty())
     {
         queue.resize(newCapacity);
         return true;
