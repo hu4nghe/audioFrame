@@ -1,22 +1,17 @@
-﻿#include <condition_variable>
-#include <mutex>
-#include <thread>
-
+﻿#include <thread>
 #include <csignal>
 
 #include "Processing.NDI.Lib.h" 
 #include "portaudio.h"
-#include "sndfile.hh"
-#include "samplerate.h"
 #include "audioFrame.h"
-
-constexpr auto SAMPLE_RATE = 44100;
-constexpr auto PA_BUFFER_SIZE = 128;
-audioQueue<float> data(20000);
 
 // System signal catch handler
 static std::atomic<bool> exit_loop(false);
 static void sigIntHandler(int) { exit_loop = true; }
+
+constexpr auto SAMPLE_RATE = 44100;
+constexpr auto PA_BUFFER_SIZE = 128;
+audioQueue<float> data(20000);
 
 inline void PAErrorCheck(PaError err){if (err != paNoError){ std::print("PortAudio error : {}.\n", Pa_GetErrorText(err)); exit(EXIT_FAILURE);}}
 
@@ -24,9 +19,9 @@ void NDIAudioTread()
 {
 	std::signal(SIGINT, sigIntHandler);
 
-	///////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
+	///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 	/*Preparation phase*/
+
 	NDIlib_initialize();
 	// Create a NDI finder and try to find a source NDI 
 	const NDIlib_find_create_t NDIFindCreateDesc;
@@ -62,9 +57,9 @@ void NDIAudioTread()
 	}
 	NDIlib_find_destroy(pNDIFind);
 
-	///////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
+	///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 	/*NDI data capture loop*/
+
 	NDIlib_audio_frame_v2_t audioInput;
 	while (!exit_loop)
 	{
@@ -89,13 +84,11 @@ void NDIAudioTread()
 		}
 	}
 
-	///////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
+	///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 	/*NDI Clean up*/
+
 	NDIlib_recv_destroy(pNDI_recv);
 	NDIlib_destroy();
-
-	///////////////////////////////////////////////////////////////////////////////////////////////////////////////
 }
 
 static int portAudioOutputCallback( const void* inputBuffer, 
