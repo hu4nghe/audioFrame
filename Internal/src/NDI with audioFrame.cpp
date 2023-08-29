@@ -11,7 +11,8 @@ static void sigIntHandler(int) { exit_loop = true; }
 
 constexpr auto SAMPLE_RATE = 44100;
 constexpr auto PA_BUFFER_SIZE = 128;
-audioQueue<float> data(20000);
+constexpr auto QueueCapacity = 15000;
+audioQueue<float> data(QueueCapacity);
 
 inline void PAErrorCheck(PaError err){if (err != paNoError){ std::print("PortAudio error : {}.\n", Pa_GetErrorText(err)); exit(EXIT_FAILURE);}}
 
