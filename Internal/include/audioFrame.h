@@ -87,6 +87,7 @@ public:
     }
     void pop(float*& ptr, size_t size) 
     {
+        auto start = std::chrono::high_resolution_clock::now();
         if(size > elementCount.load())
             std::print("Warning : there is only {} elements in the queue, {} demanded.\n", elementCount.load(), size);
 
@@ -94,6 +95,7 @@ public:
         {
             this->dequeue(ptr[i]);
         }
+        std::print("pop time : {} microseconds.\n", std::chrono::duration_cast<std::chrono::microseconds>(std::chrono::high_resolution_clock::now() - start).count());
     }
     bool resize(size_t newCapacity)
     {
@@ -108,7 +110,8 @@ public:
             std::print("It is no allowed to resize a queue in use !\n");
             return false;
         }
-            
+       
+        
     }
 };
 

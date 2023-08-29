@@ -79,6 +79,8 @@ void NDIAudioTread()
 			data.setSampleRate(audioInput.no_samples);
 			data.push(audio_frame_32bpp_interleaved.p_data, dataSize);
 
+			delete[] audio_frame_32bpp_interleaved.p_data;
+
 			std::print("NDI : {} sample transmitted and there are {} element in the queue.\n", audioInput.no_samples, data.size());
 		}
 	}
@@ -110,9 +112,9 @@ void portAudioThread()
 
 	PAErrorCheck(Pa_Initialize());
 	PaStream* stream;
-	PAErrorCheck(Pa_OpenDefaultStream(&stream, 0, 2, paFloat32, SAMPLE_RATE, 512, NDIAudioCallback, nullptr));
+	PAErrorCheck(Pa_OpenDefaultStream(&stream, 0, 2, paFloat32, SAMPLE_RATE, 1024, NDIAudioCallback, nullptr));
 	PAErrorCheck(Pa_StartStream(stream));
-	std::print("playing...");
+	std::print("playing...\n");
 	while (!exit_loop){}
 	PAErrorCheck(Pa_StopStream(stream));
 	PAErrorCheck(Pa_CloseStream(stream));
