@@ -1,22 +1,18 @@
-﻿#include <atomic>
-#include <condition_variable>
+﻿#include <condition_variable>
 #include <mutex>
 #include <thread>
 
 #include <csignal>
 
-#include <queue>
-
 #include "Processing.NDI.Lib.h" 
 #include "audioFrame.h"
 
 constexpr auto SAMPLE_RATE = 44100;
+audioQueue<float> data(2147483648);
 
 // System signal catch handler
 static std::atomic<bool> exit_loop(false);
 static void sigIntHandler(int) { exit_loop = true; }
-
-audioQueue<float> data(2147483648);
 
 inline void PAErrorCheck(PaError err){if (err != paNoError){ std::print("PortAudio error : {}.\n", Pa_GetErrorText(err)); exit(EXIT_FAILURE);}}
 
@@ -24,8 +20,10 @@ void NDIAudioTread()
 {
 	std::signal(SIGINT, sigIntHandler);
 
-	NDIlib_initialize();
+	///////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+	/*Preparation phase*/
+	NDIlib_initialize();
 	// Create a NDI finder and try to find a source NDI 
 	const NDIlib_find_create_t NDIFindCreateDesc;
 	auto pNDIFind = NDIlib_find_create_v2(&NDIFindCreateDesc);
@@ -60,7 +58,9 @@ void NDIAudioTread()
 	}
 	NDIlib_find_destroy(pNDIFind);
 
-	// NDI data capture loop
+	///////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+	/*NDI data capture loop*/
 	NDIlib_audio_frame_v2_t audioInput;
 	while (!exit_loop)
 	{
@@ -78,13 +78,18 @@ void NDIAudioTread()
 			data.setChannelNum(audioInput.no_channels);
 			data.setSampleRate(audioInput.no_samples);
 			data.push(audio_frame_32bpp_interleaved.p_data, dataSize);
-			delete[] audio_frame_32bpp_interleaved.p_data;
-			audio_frame_32bpp_interleaved.p_data = nullptr;
-			std::cout<< "NDI : there are " << data.getsize() <<" element in the queue.\n";
+
+			std::print("NDI : {} sample transmitted and there are {} element in the queue.\n", audioInput.no_samples, data.size());
 		}
 	}
+
+	///////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+	/*NDI Clean up*/
 	NDIlib_recv_destroy(pNDI_recv);
 	NDIlib_destroy();
+
+	///////////////////////////////////////////////////////////////////////////////////////////////////////////////
 }
 
 static int NDIAudioCallback(const void* inputBuffer, 
@@ -96,7 +101,6 @@ static int NDIAudioCallback(const void* inputBuffer,
 {
 	auto out = static_cast<float*>(outputBuffer);
 	data.pop(out, framesPerBuffer);
-
 	return paContinue;
 }
 
@@ -105,15 +109,11 @@ void portAudioThread()
 	std::signal(SIGINT, sigIntHandler);
 
 	PAErrorCheck(Pa_Initialize());
-	std::this_thread::sleep_for(std::chrono::seconds(10));
 	PaStream* stream;
 	PAErrorCheck(Pa_OpenDefaultStream(&stream, 0, 2, paFloat32, SAMPLE_RATE, 512, NDIAudioCallback, nullptr));
 	PAErrorCheck(Pa_StartStream(stream));
-
-	while (!exit_loop)
-	{
-		
-	}
+	std::print("playing...");
+	while (!exit_loop){}
 	PAErrorCheck(Pa_StopStream(stream));
 	PAErrorCheck(Pa_CloseStream(stream));
 	PAErrorCheck(Pa_Terminate());
@@ -124,9 +124,8 @@ int main()
 	std::thread ndiThread(NDIAudioTread);
 	std::thread ndiPortaudio(portAudioThread);
 
-	ndiThread.join();
+	ndiThread.detach();
 	ndiPortaudio.join();
 	                  
 	return 0;
 }
-

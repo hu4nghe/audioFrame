@@ -7,10 +7,8 @@
 #include <print>
 
 #include <vector>
-
+#include <atomic>
 #include <memory>
-#include <mutex>
-#include <thread>
 #include <type_traits>
 #include <utility>
 
@@ -32,6 +30,15 @@ private:
     uint32_t sampleRate;
     uint32_t channelNum;
 
+    bool isDefault(T value)
+    {
+        if constexpr (std::is_same_v<T, float>) 
+            return value == 0.0f;
+        else if constexpr (std::is_same_v<T, short>) 
+            return value == 0;
+        else 
+            return false;
+    }
     bool enqueue(const T& value) 
     {
         size_t currentTail = tail.load(std::memory_order_relaxed);
@@ -57,51 +64,36 @@ private:
         elementCount.fetch_sub(1, std::memory_order_relaxed);
         return true;
     }
-    bool isDefault(T value)
-    {
-        if constexpr (std::is_same_v<T, float>) 
-            return value == 0.0f;
-        else if constexpr (std::is_same_v<T, short>) 
-            return value == 0;
-        else 
-            return false;
-    }
+
 public:
     audioQueue() = default;
     audioQueue(size_t size) : capacity(size), queue(capacity), head(0), tail(0), sampleRate(0), channelNum(0), elementCount(0){}
 
     inline void setSampleRate(uint32_t sRate) { sampleRate = sRate; }
     inline void setChannelNum(uint32_t cNum) { channelNum = cNum; }
-
-    inline size_t getsize() { return elementCount; }
+    inline size_t size() { return elementCount.load(); }
 
     bool push(const T* ptr, size_t size)
     {
         for (auto i = 0; i < size; i++)
         {
-            bool isAvailable = this->enqueue(ptr[i]);
-            if (!isAvailable)
+            if (!(this->enqueue(ptr[i])))
             {
                 std::print("Not enough space in queue.\n");
-                return false;
+                exit(EXIT_FAILURE);
             }
         }
         return true;
     }
-    bool pop(T*& out, size_t size)
+    void pop(float*& ptr, size_t size) 
     {
-        auto temp = std::make_unique<T[]>(size);
-        for (auto i = 0; i < size; i++)
+        if(size > elementCount.load())
+            std::print("Warning : there is only {} elements in the queue, {} demanded.\n", elementCount.load(), size);
+
+        for (size_t i = 0; i < size; i++) 
         {
-            bool notEmpty = this->dequeue(temp[i]);
-            if (!notEmpty)
-            {
-                std::print("Queue is empty.\n");
-                return false;
-            }
+            this->dequeue(ptr[i]);
         }
-        out = std::move(temp.get());
-        return true;
     }
     bool resize(size_t newCapacity)
     {

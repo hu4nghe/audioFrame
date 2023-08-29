@@ -47,7 +47,7 @@ int main()
     data.push(a, 5);
 
     float* out = new float[5];
-    data.pop(out, 5);
+    data.pop(out, 11);
 
     for (int i = 0; i < 5; i++)
         std::cout << out[i] << std::endl;
