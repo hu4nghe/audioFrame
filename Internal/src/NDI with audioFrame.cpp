@@ -5,6 +5,9 @@
 #include <csignal>
 
 #include "Processing.NDI.Lib.h" 
+#include "portaudio.h"
+#include "sndfile.hh"
+#include "samplerate.h"
 #include "audioFrame.h"
 
 constexpr auto SAMPLE_RATE = 44100;
@@ -71,17 +74,17 @@ void NDIAudioTread()
 			const size_t dataSize = audioInput.no_samples * audioInput.no_channels;
 
 			// Create a NDI audio object and convert it to interleaved float format.
-			NDIlib_audio_frame_interleaved_32f_t audio_frame_32bpp_interleaved;
-			audio_frame_32bpp_interleaved.p_data = new float[dataSize];
-			NDIlib_util_audio_to_interleaved_32f_v2(&audioInput, &audio_frame_32bpp_interleaved);
+			NDIlib_audio_frame_interleaved_32f_t audioDataNDI;
+			audioDataNDI.p_data = new float[dataSize];
+			NDIlib_util_audio_to_interleaved_32f_v2(&audioInput, &audioDataNDI);
 
 			data.setChannelNum(audioInput.no_channels);
-			data.setSampleRate(audioInput.no_samples);
-			data.push(audio_frame_32bpp_interleaved.p_data, dataSize);
+			data.setSampleRate(audioInput.sample_rate);
+			data.push(audioDataNDI.p_data, audioInput.no_samples);
 
-			delete[] audio_frame_32bpp_interleaved.p_data;
+			delete[] audioDataNDI.p_data;
 
-			std::print("NDI : {} sample transmitted and there are {} element in the queue.\n", audioInput.no_samples, data.size());
+			std::print("NDI : {} sample pushed and there are {} element in the queue.\n", audioInput.no_samples, data.size());
 		}
 	}
 
@@ -101,8 +104,10 @@ static int NDIAudioCallback(const void* inputBuffer,
 							PaStreamCallbackFlags statusFlags,
 							void* userData)
 {
+	
 	auto out = static_cast<float*>(outputBuffer);
 	data.pop(out, framesPerBuffer);
+	std::print("PA  : {} sample poped  and there are {} element in the queue.\n", framesPerBuffer, data.size());
 	return paContinue;
 }
 

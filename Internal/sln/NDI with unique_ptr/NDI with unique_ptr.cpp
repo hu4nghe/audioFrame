@@ -103,12 +103,12 @@ void NDIAudioTread()
 			}
 
 			// Create a NDI audio object and convert it to interleaved float format.
-			NDIlib_audio_frame_interleaved_32f_t audio_frame_32bpp_interleaved;
-			audio_frame_32bpp_interleaved.p_data = new float[audioFrame.no_samples * audioFrame.no_channels];
-			NDIlib_util_audio_to_interleaved_32f_v2(&audioFrame, &audio_frame_32bpp_interleaved);
+			NDIlib_audio_frame_interleaved_32f_t audioDataNDI;
+			audioDataNDI.p_data = new float[audioFrame.no_samples * audioFrame.no_channels];
+			NDIlib_util_audio_to_interleaved_32f_v2(&audioFrame, &audioDataNDI);
 
 			// Transfer the ownership of audio data to smart pointer and push it into the queue.
-			std::unique_ptr<float> audioData(audio_frame_32bpp_interleaved.p_data);
+			std::unique_ptr<float> audioData(audioDataNDI.p_data);
 
 			std::lock_guard<std::mutex> lock(audioDataMtx);
 			audioBufferQueue.push(std::move(audioData));
