@@ -30,32 +30,32 @@ private:
 
          std::vector<T> queue;
 
-                 bool   enqueue         (const T& value);
-                 bool   dequeue         (      T& value);
-                 void   clear           ();
-                 void   usageRefresh    ();
+                   bool enqueue         (const T& value);
+                   bool dequeue         (      T& value);
+                   void clear           ();
+                   void usageRefresh    ();
                 
 public:
                         audioQueue      () = default;
                         audioQueue      (const size_t initialCapacity);
 
-                 bool   push            (const T*  ptr, size_t frames);
-                 void   pop             (      T*& ptr, size_t frames);                
+                   bool push            (const T*  ptr, size_t frames);
+                   void pop             (      T*& ptr, size_t frames);                
 
-//      audioQueue<T>   operator+       (const audioQueue<T>&& other);
+//        audioQueue<T> operator+       (const audioQueue<T>&& other);
 
-    inline       void   setSampleRate   (const size_t  sRate){ audioSampleRate = sRate; }
-    inline       void   setChannelNum   (const size_t  cNum ){ channelNum = cNum; }
-                 void   setCapacity     (const size_t  newCapacity);
-                 void   setDelay        (const uint8_t lower, 
+    inline         void setSampleRate   (const size_t  sRate){ audioSampleRate = sRate; }
+    inline         void setChannelNum   (const size_t  cNum ){ channelNum = cNum; }
+                   void setCapacity     (const size_t  newCapacity);
+                   void setDelay        (const uint8_t lower, 
                                          const uint8_t upper, 
                                          const size_t time);
-//               void   setVolume       (const uint8_t volume);                 
+//                 void setVolume       (const uint8_t volume);                 
 
-    inline     size_t   channels        () const { return channelNum; }
-    inline     size_t   sampleRate      () const { return audioSampleRate; }
-    inline     size_t   size            () const { return elementCount.load(); }
-    inline       bool   empty           () const { return elementCount == 0;}
+    inline       size_t channels        () const { return channelNum; }
+    inline       size_t sampleRate      () const { return audioSampleRate; }
+    inline       size_t size            () const { return elementCount.load(); }
+    inline         bool empty           () const { return elementCount == 0;}
 
 };
 

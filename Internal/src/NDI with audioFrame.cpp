@@ -32,7 +32,7 @@ void NDIAudioTread()
 		std::print("Error : Unable to create NDI finder.\n");
 		return;
 	}
-	unsigned int noSources = 0;
+	uint32_t noSources = 0;
 	const NDIlib_source_t* pSources = nullptr;
 	while (!exit_loop && !noSources)
 	{
@@ -47,8 +47,9 @@ void NDIAudioTread()
 
 	//Create a NDI receiver if the NDI source is found.
 	NDIlib_recv_create_v3_t NDIRecvCreateDesc;
-	NDIRecvCreateDesc.source_to_connect_to = *pSources;
-	NDIRecvCreateDesc.p_ndi_recv_name = "Audio Receiver";
+	NDIRecvCreateDesc.source_to_connect_to	= *pSources;
+	NDIRecvCreateDesc.p_ndi_recv_name		= "Audio Receiver";
+
 	auto pNDI_recv = NDIlib_recv_create_v3(&NDIRecvCreateDesc);
 	if (pNDI_recv == nullptr)
 	{
@@ -75,10 +76,10 @@ void NDIAudioTread()
 			audioDataNDI.p_data = new float[dataSize];
 			NDIlib_util_audio_to_interleaved_32f_v2(&audioInput, &audioDataNDI);
 
-			data.setChannelNum(audioInput.no_channels);
-			data.setSampleRate(audioInput.sample_rate);
-			data.setCapacity(static_cast<size_t>(dataSize * 2));
-			data.push(audioDataNDI.p_data, audioInput.no_samples);
+			data.setChannelNum	(audioInput.no_channels);
+			data.setSampleRate	(audioInput.sample_rate);
+			data.setCapacity	(static_cast<size_t>(dataSize * 2));
+			data.push			(audioDataNDI.p_data, audioInput.no_samples);
 
 			delete[] audioDataNDI.p_data;
 		}
@@ -111,8 +112,10 @@ void portAudioOutputThread()
 	PaStream* streamOut;
 	PAErrorCheck(Pa_OpenDefaultStream(&streamOut, 2, 2, paFloat32, SAMPLE_RATE, PA_BUFFER_SIZE, portAudioOutputCallback, nullptr));
 	PAErrorCheck(Pa_StartStream(streamOut));
+
 	std::print("playing...\n");
 	while (!exit_loop){}
+
 	PAErrorCheck(Pa_StopStream(streamOut));
 	PAErrorCheck(Pa_CloseStream(streamOut));
 	PAErrorCheck(Pa_Terminate());
