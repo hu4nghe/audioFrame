@@ -77,12 +77,10 @@ void NDIAudioTread()
 
 			data.setChannelNum(audioInput.no_channels);
 			data.setSampleRate(audioInput.sample_rate);
-			data.setCapacity(dataSize * 2);
+			data.setCapacity(static_cast<size_t>(dataSize * 2));
 			data.push(audioDataNDI.p_data, audioInput.no_samples);
 
 			delete[] audioDataNDI.p_data;
-
-			//std::print("							NDI : {} sample pushed,{} sample in the queue.\n", audioInput.no_samples, data.size());
 		}
 	}
 
@@ -102,7 +100,6 @@ static int portAudioOutputCallback( const void* inputBuffer,
 {
 	auto out = static_cast<float*>(outputBuffer);
 	data.pop(out, framesPerBuffer);
-	//std::print("PA out :{} sample poped, {} sample in the queue.\n", framesPerBuffer, data.size());
 	return paContinue;
 }
 
