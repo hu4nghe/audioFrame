@@ -99,3 +99,38 @@ void NDIErrorCheck(T* ptr)
 {
 
 }*/
+/*
+template <typename T>
+auto NDIErrorCheck(T* err) -> decltype(err)
+{
+	if constexpr (std::is_same<T, NDIlib_find_instance_type>::value)
+	{
+		if (err == nullptr)
+		{
+			std::print("Error : Unable to create NDI finder.\n");
+			exit(EXIT_FAILURE);
+		}
+		else return err;
+
+	}
+	else if constexpr (std::is_same<T, NDIlib_source_t>::value)
+	{
+		if (err == nullptr)
+		{
+			std::print("Error : No source available!.\n");
+			exit(EXIT_FAILURE);
+		}
+		else return err;
+	}
+	else if constexpr (std::is_same<T, NDIlib_recv_instance_t>::value)
+	{
+		if (err == nullptr)
+		{
+			std::print("Error : Unable to create NDI receiver.\n");
+			exit(EXIT_FAILURE);
+		}
+		else return err;
+	}
+	else
+		exit(EXIT_FAILURE);
+}*/

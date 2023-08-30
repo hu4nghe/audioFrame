@@ -11,8 +11,8 @@ static void sigIntHandler(int) { exit_loop = true; }
 
 constexpr auto SAMPLE_RATE = 44100;
 constexpr auto PA_BUFFER_SIZE = 128;
-constexpr auto QueueCapacity = 15000;
-audioQueue<float> data(QueueCapacity);
+
+audioQueue<float> data(0);
 
 inline void PAErrorCheck(PaError err){if (err != paNoError){ std::print("PortAudio error : {}.\n", Pa_GetErrorText(err)); exit(EXIT_FAILURE);}}
 
@@ -77,11 +77,12 @@ void NDIAudioTread()
 
 			data.setChannelNum(audioInput.no_channels);
 			data.setSampleRate(audioInput.sample_rate);
+			data.setCapacity(dataSize * 2);
 			data.push(audioDataNDI.p_data, audioInput.no_samples);
 
 			delete[] audioDataNDI.p_data;
 
-			std::print("							NDI : {} sample pushed,{} sample in the queue.\n", audioInput.no_samples, data.size());
+			//std::print("							NDI : {} sample pushed,{} sample in the queue.\n", audioInput.no_samples, data.size());
 		}
 	}
 
@@ -101,7 +102,7 @@ static int portAudioOutputCallback( const void* inputBuffer,
 {
 	auto out = static_cast<float*>(outputBuffer);
 	data.pop(out, framesPerBuffer);
-	std::print("PA out :{} sample poped, {} sample in the queue.\n", framesPerBuffer, data.size());
+	//std::print("PA out :{} sample poped, {} sample in the queue.\n", framesPerBuffer, data.size());
 	return paContinue;
 }
 
