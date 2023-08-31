@@ -65,7 +65,7 @@ template<typename T, typename U>
 inline audioQueue<T, U>::audioQueue(const size_t initialCapacity)
     : capacity(initialCapacity), queue(capacity), head(0), tail(0),
       audioSampleRate(0), channelNum(0), elementCount(0), usage(0),
-      lowerThreshold(20), upperThreshold(80), delayTime(10){}
+      lowerThreshold(20), upperThreshold(80), delayTime(20){}
 
 // Private member functions ///////////////////////////////////////////////////////////////////////////// 
 
@@ -75,13 +75,12 @@ bool audioQueue<T,U>::enqueue(const T& value)
     size_t currentTail = tail.load(std::memory_order_relaxed);
     size_t    nextTail = (currentTail + 1) % capacity;
 
-    if (nextTail == head.load(std::memory_order_acquire)) 
-        return false; // Queue is full
+    if (nextTail == head.load(std::memory_order_acquire)) return false; // Queue is full
 
     queue[currentTail] = value;
     tail.store(nextTail, std::memory_order_release);
-
     elementCount.fetch_add(1, std::memory_order_relaxed);
+
     return true;
 }
 
@@ -94,16 +93,16 @@ bool audioQueue<T,U>::dequeue(T& value)
 
     value = queue[currentHead];
     head.store((currentHead + 1) % capacity, std::memory_order_release);
-
     elementCount.fetch_sub(1, std::memory_order_relaxed);
+
     return true;
 }
 
 template<typename T, typename U>
 inline void audioQueue<T,U>::clear()
 {
-    head.store(0);
-    tail.store(0);
+    head        .store(0);
+    tail        .store(0);
     elementCount.store(0);
 }
 
@@ -119,35 +118,33 @@ inline void audioQueue<T,U>::usageRefresh()
 template<typename T, typename U>
 bool audioQueue<T,U>::push(const T* ptr, size_t frames)
 {
-    
-    if (usage.load() >= upperThreshold)
-    {
-        std::this_thread::sleep_for(std::chrono::milliseconds(delayTime));
-        std::print("                    Input Delay Called\n");
-    }
     size_t size = frames * channelNum;
     for (auto i = 0; i < size; i++)
-    {
-        if (!(this->enqueue(ptr[i])))
-        {
+        if (!(this->enqueue(ptr[i]))) 
             std::print("                    Not enough space in queue, data will be lose !\n");
-        }
-    }
-    
+
     usageRefresh();
-    std::print("                    Thread 1 : Data pushed !\n");
+
+        std::print("                                                            Thread 1 : Data pushed !\n");
+
+    if (usage.load() >= upperThreshold)
+    {
+        std::print("                                                            Thread 1 : Input Delay Called\n");
+        std::this_thread::sleep_for(std::chrono::milliseconds(delayTime));
+    }
+
     return true;
 }
 
 template<typename T, typename U>
 void audioQueue<T,U>::pop(T*& ptr, size_t frames)
-{
+{   
     size_t size = frames * channelNum;
 
     if (usage.load() <= lowerThreshold)
     {
-        std::this_thread::sleep_for(std::chrono::milliseconds(delayTime));
         std::print("                    Thread 2 : Output Delay Called\n");
+        std::this_thread::sleep_for(std::chrono::milliseconds(delayTime));
     }
 
     if (size > elementCount.load())
