@@ -55,7 +55,6 @@ public:
     inline       size_t channels        () const { return channelNum; }
     inline       size_t sampleRate      () const { return audioSampleRate; }
     inline       size_t size            () const { return elementCount.load(); }
-    inline         bool empty           () const { return elementCount == 0;}
 
 };
 
@@ -110,7 +109,6 @@ template<typename T, typename U>
 inline void audioQueue<T,U>::usageRefresh()
 {
     usage.store(static_cast<uint8_t>(static_cast<double>(elementCount.load()) / capacity * 100.0));
-    std::print("Queue usage : {}%.\n", usage.load());
 }
 
 // Public APIs //////////////////////////////////////////////////////////////////////////////////////////
@@ -119,20 +117,26 @@ template<typename T, typename U>
 bool audioQueue<T,U>::push(const T* ptr, size_t frames)
 {
     size_t size = frames * channelNum;
-    for (auto i = 0; i < size; i++)
-        if (!(this->enqueue(ptr[i]))) 
-            std::print("                    Not enough space in queue, data will be lose !\n");
-
-    usageRefresh();
-
-        std::print("                                                            Thread 1 : Data pushed !\n");
-
-    if (usage.load() >= upperThreshold)
+    std::print("                                                                                    Thread 1 : current usage : {}%, estimated usage after push operation: {}%\n", usage.load(), usage.load() + (size * 100 / capacity));
+    if (usage.load() + (size * 100 /capacity) >= upperThreshold)
     {
-        std::print("                                                            Thread 1 : Input Delay Called\n");
+        
+        std::print("                                                                                    Thread 1 : Input Delay Called\n");
         std::this_thread::sleep_for(std::chrono::milliseconds(delayTime));
     }
-
+    
+    for (auto i = 0; i < size; i++)
+    {
+        if (!(this->enqueue(ptr[i])))
+        {
+            usageRefresh();
+            std::print("                                                                                    Thread 1 : push operation aborted : not enough space\n");
+            return false;
+        }
+        
+    }
+    usageRefresh();
+    std::print("                                                                                    Thread 1 : push sucess\n");
     return true;
 }
 
@@ -140,15 +144,15 @@ template<typename T, typename U>
 void audioQueue<T,U>::pop(T*& ptr, size_t frames)
 {   
     size_t size = frames * channelNum;
-
+    std::print("Thread 2 : current usage : {}%, estimated usage after pop operation: {}%\n", usage.load(), usage.load() - (size * 100 / capacity));
     if (usage.load() <= lowerThreshold)
     {
-        std::print("                    Thread 2 : Output Delay Called\n");
+        std::print("Thread 2 : Output Delay Called\n");
         std::this_thread::sleep_for(std::chrono::milliseconds(delayTime));
     }
 
     if (size > elementCount.load())
-        std::print("                    Warning : there is only {} elements in the queue, {} demanded.\n", elementCount.load(), size);
+        std::print("Warning : there is only {} elements in the queue, {} demanded.\n", elementCount.load(), size);
 
     for (size_t i = 0; i < size; i++)
     {
@@ -163,7 +167,7 @@ inline void audioQueue<T,U>::setCapacity(size_t newCapacity)
     if (newCapacity == capacity) return;
     else
     {
-        if (!this->empty()) this->clear();
+        if (!this->size()) this->clear();
 
         queue.resize(newCapacity);
         capacity = newCapacity;

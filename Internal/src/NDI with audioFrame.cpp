@@ -11,7 +11,8 @@ static void sigIntHandler(int) { exit_loop = true; }
 
 constexpr auto SAMPLE_RATE					= 44100;
 constexpr auto PA_BUFFER_SIZE				= 128;
-constexpr auto NDI_SOURCE_SEARCH_TIMEOUT	= 1000;
+constexpr auto NDI_TIMEOUT					= 1000;
+constexpr auto QUEUE_SIZE_MULTIPLIER		= 1.5;
 
 audioQueue<float> data(0);
 
@@ -34,7 +35,7 @@ void NDIAudioTread()
 	const NDIlib_source_t* pSources = nullptr;
 	while (!exit_loop && !noSources)
 	{
-		NDIlib_find_wait_for_sources(pNDIFind, NDI_SOURCE_SEARCH_TIMEOUT);
+		NDIlib_find_wait_for_sources(pNDIFind, NDI_TIMEOUT);
 		pSources = NDIlib_find_get_current_sources(pNDIFind, &noSources);
 	}
 	NDIErrorCheck(pSources);
@@ -53,7 +54,7 @@ void NDIAudioTread()
 	while (!exit_loop)
 	{
 		// Capture NDI data
-		auto NDI_frame_type = NDIlib_recv_capture_v2(pNDI_recv, nullptr, &audioInput, nullptr, 1000);
+		auto NDI_frame_type = NDIlib_recv_capture_v2(pNDI_recv, nullptr, &audioInput, nullptr, NDI_TIMEOUT);
 		if (NDI_frame_type == NDIlib_frame_type_audio)
 		{
 			const size_t dataSize = audioInput.no_samples * audioInput.no_channels;
@@ -65,7 +66,7 @@ void NDIAudioTread()
 
 			data.setChannelNum	(audioInput.no_channels);
 			data.setSampleRate	(audioInput.sample_rate);
-			data.setCapacity	(static_cast<size_t>(dataSize * 1.3));
+			data.setCapacity	(static_cast<size_t>(dataSize * QUEUE_SIZE_MULTIPLIER));
 			data.push			(audioDataNDI.p_data, audioInput.no_samples);
 
 			delete[] audioDataNDI.p_data;
@@ -110,7 +111,11 @@ void portAudioOutputThread()
 	PAErrorCheck(Pa_StartStream			(streamOut));
 
 	std::print("playing...\n");
-	while (!exit_loop){}
+	while (!exit_loop)
+	{
+		if (!data.size()) Pa_StopStream(streamOut);
+		if (data.size() && Pa_IsStreamStopped(streamOut)) Pa_StartStream(streamOut);
+	}
 
 	PAErrorCheck(Pa_StopStream			(streamOut));
 	PAErrorCheck(Pa_CloseStream			(streamOut));
