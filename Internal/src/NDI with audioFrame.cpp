@@ -14,7 +14,7 @@ static void sigIntHandler(int) { exit_loop = true; }
 constexpr auto SAMPLE_RATE					= 44100;
 constexpr auto PA_BUFFER_SIZE				= 128;
 constexpr auto NDI_TIMEOUT					= 1000;
-constexpr auto QUEUE_SIZE_MULTIPLIER		= 1.4;
+constexpr auto QUEUE_SIZE_MULTIPLIER		= 1.2;
 
 audioQueue<float> data(0);
 

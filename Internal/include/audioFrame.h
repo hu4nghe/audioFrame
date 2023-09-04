@@ -63,7 +63,7 @@ template<typename T, typename U>
 inline audioQueue<T, U>::audioQueue(const size_t initialCapacity)
     : capacity(initialCapacity), queue(capacity), head(0), tail(0),
       audioSampleRate(0), channelNum(0), elementCount(0), usage(0),
-      lowerThreshold(20), upperThreshold(95), delayTime(20){}
+      lowerThreshold(5), upperThreshold(60), delayTime(15){}
 
 // Private member functions ///////////////////////////////////////////////////////////////////////////// 
 
@@ -120,10 +120,11 @@ bool audioQueue<T,U>::push(const T* ptr, size_t frames)
     if (usage.load() + (size * 100 /capacity) >= upperThreshold)
     {
         std::print("                                                                                    Thread 1 : Input Delay Called\n");
-        std::this_thread::sleep_for(std::chrono::milliseconds(delayTime));
+        std::this_thread::sleep_for(std::chrono::milliseconds(delayTime-3));
         std::print("                                                                                    Thread 1 : Input Delay ended\n");
     }
     std::print("                                                                                    Thread 1 : Push operation started\n");
+    std::print("                                                                                    Thread 1 : usage after delay: {}%, estimated usage after push operation: {}%\n", usage.load(), usage.load() + (size * 100 / capacity));
     for (auto i = 0; i < size; i++)
     {
         if (!(this->enqueue(ptr[i])))
@@ -143,8 +144,9 @@ template<typename T, typename U>
 void audioQueue<T,U>::pop(T*& ptr, size_t frames)
 {   
     size_t size = frames * channelNum;
-    std::print("Thread 2 : current usage : {}%, estimated usage after pop operation: {}%\n", usage.load(), usage.load() - (size * 100 / capacity));
-    if (usage.load() <= lowerThreshold)
+    size_t estimatedUsage = usage.load() >= (size * 100 / capacity) ? usage.load() - (size * 100 / capacity) : 0;
+    std::print("Thread 2 : current usage : {}%, estimated usage after pop operation: {}%\n", usage.load(), estimatedUsage);
+    if (estimatedUsage <= lowerThreshold)
     {
         std::print("Thread 2 : Output Delay Called\n");
         std::this_thread::sleep_for(std::chrono::milliseconds(delayTime));
