@@ -9,10 +9,12 @@
 static std::atomic<bool> exit_loop(false);
 static void sigIntHandler(int) { exit_loop = true; }
 
+
+
 constexpr auto SAMPLE_RATE					= 44100;
 constexpr auto PA_BUFFER_SIZE				= 128;
 constexpr auto NDI_TIMEOUT					= 1000;
-constexpr auto QUEUE_SIZE_MULTIPLIER		= 1.5;
+constexpr auto QUEUE_SIZE_MULTIPLIER		= 1.4;
 
 audioQueue<float> data(0);
 
@@ -51,6 +53,7 @@ void NDIAudioTread()
 	/*NDI data capture loop*/
 
 	NDIlib_audio_frame_v2_t audioInput;
+
 	while (!exit_loop)
 	{
 		// Capture NDI data
@@ -63,9 +66,9 @@ void NDIAudioTread()
 			NDIlib_audio_frame_interleaved_32f_t audioDataNDI;
 			audioDataNDI.p_data = new float[dataSize];
 			NDIlib_util_audio_to_interleaved_32f_v2(&audioInput, &audioDataNDI);
-
-			data.setChannelNum	(audioInput.no_channels);
-			data.setSampleRate	(audioInput.sample_rate);
+			
+			if(audioInput.no_channels != data.channels())	data.setChannelNum	(audioInput.no_channels);
+			if(audioInput.sample_rate != data.sampleRate()) data.setSampleRate	(audioInput.sample_rate);
 			data.setCapacity	(static_cast<size_t>(dataSize * QUEUE_SIZE_MULTIPLIER));
 			data.push			(audioDataNDI.p_data, audioInput.no_samples);
 
@@ -87,8 +90,15 @@ static int portAudioOutputCallback(const void* inputBuffer,
 								   PaStreamCallbackFlags statusFlags,
 								   void* userData)
 {
+	auto in = static_cast<const float*>(inputBuffer);
 	auto out = static_cast<float*>(outputBuffer);
+
 	data.pop(out, framesPerBuffer);
+	
+	for (auto i = 0; i < framesPerBuffer * 2; i++)
+	{
+		out[i] += in[i]*3;
+	}
 	return paContinue;
 }
 
@@ -113,13 +123,13 @@ void portAudioOutputThread()
 	std::print("playing...\n");
 	while (!exit_loop)
 	{
-		if (!data.size()) Pa_StopStream(streamOut);
+		if (!data.size()) Pa_AbortStream(streamOut);
 		if (data.size() && Pa_IsStreamStopped(streamOut)) Pa_StartStream(streamOut);
 	}
 
-	PAErrorCheck(Pa_StopStream			(streamOut));
-	PAErrorCheck(Pa_CloseStream			(streamOut));
-	PAErrorCheck(Pa_Terminate			());
+	PAErrorCheck(Pa_StopStream	(streamOut));
+	PAErrorCheck(Pa_CloseStream	(streamOut));
+	PAErrorCheck(Pa_Terminate	());
 }
 
 int main()

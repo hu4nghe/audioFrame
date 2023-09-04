@@ -55,7 +55,6 @@ public:
     inline       size_t channels        () const { return channelNum; }
     inline       size_t sampleRate      () const { return audioSampleRate; }
     inline       size_t size            () const { return elementCount.load(); }
-
 };
 
 // Constructor ////////////////////////////////////////////////////////////////////////////////////////// 
@@ -64,7 +63,7 @@ template<typename T, typename U>
 inline audioQueue<T, U>::audioQueue(const size_t initialCapacity)
     : capacity(initialCapacity), queue(capacity), head(0), tail(0),
       audioSampleRate(0), channelNum(0), elementCount(0), usage(0),
-      lowerThreshold(20), upperThreshold(80), delayTime(20){}
+      lowerThreshold(20), upperThreshold(95), delayTime(20){}
 
 // Private member functions ///////////////////////////////////////////////////////////////////////////// 
 
@@ -120,11 +119,11 @@ bool audioQueue<T,U>::push(const T* ptr, size_t frames)
     std::print("                                                                                    Thread 1 : current usage : {}%, estimated usage after push operation: {}%\n", usage.load(), usage.load() + (size * 100 / capacity));
     if (usage.load() + (size * 100 /capacity) >= upperThreshold)
     {
-        
         std::print("                                                                                    Thread 1 : Input Delay Called\n");
         std::this_thread::sleep_for(std::chrono::milliseconds(delayTime));
+        std::print("                                                                                    Thread 1 : Input Delay ended\n");
     }
-    
+    std::print("                                                                                    Thread 1 : Push operation started\n");
     for (auto i = 0; i < size; i++)
     {
         if (!(this->enqueue(ptr[i])))
@@ -151,8 +150,7 @@ void audioQueue<T,U>::pop(T*& ptr, size_t frames)
         std::this_thread::sleep_for(std::chrono::milliseconds(delayTime));
     }
 
-    if (size > elementCount.load())
-        std::print("Warning : there is only {} elements in the queue, {} demanded.\n", elementCount.load(), size);
+    if (size > elementCount.load()) std::print("Warning : there is only {} elements in the queue, {} demanded.\n", elementCount.load(), size);
 
     for (size_t i = 0; i < size; i++)
     {
@@ -167,7 +165,7 @@ inline void audioQueue<T,U>::setCapacity(size_t newCapacity)
     if (newCapacity == capacity) return;
     else
     {
-        if (!this->size()) this->clear();
+        if (this->size()) this->clear();
 
         queue.resize(newCapacity);
         capacity = newCapacity;
