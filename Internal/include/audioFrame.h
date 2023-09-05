@@ -17,7 +17,7 @@ private:
                  size_t capacity;
                  size_t channelNum;
                  size_t inputDelay;
-                 size_t outputDelay
+                 size_t outputDelay;
 
                 uint8_t lowerThreshold;
                 uint8_t upperThreshold;
