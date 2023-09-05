@@ -16,7 +16,8 @@ private:
                  size_t audioSampleRate;
                  size_t capacity;
                  size_t channelNum;
-                 size_t delayTime;
+                 size_t inputDelay;
+                 size_t outputDelay
 
                 uint8_t lowerThreshold;
                 uint8_t upperThreshold;
@@ -49,7 +50,8 @@ public:
                    void setCapacity     (const size_t  newCapacity);
                    void setDelay        (const uint8_t lower, 
                                          const uint8_t upper, 
-                                         const size_t time);
+                                         const size_t iDelay, 
+                                         const size_t oDelay);
 //                 void setVolume       (const uint8_t volume);                 
 
     inline       size_t channels        () const { return channelNum; }
@@ -63,7 +65,7 @@ template<typename T, typename U>
 inline audioQueue<T, U>::audioQueue(const size_t initialCapacity)
     : capacity(initialCapacity), queue(capacity), head(0), tail(0),
       audioSampleRate(0), channelNum(0), elementCount(0), usage(0),
-      lowerThreshold(5), upperThreshold(60), delayTime(15){}
+      lowerThreshold(5), upperThreshold(75), inputDelay(45), outputDelay(15) {}
 
 // Private member functions ///////////////////////////////////////////////////////////////////////////// 
 
@@ -115,16 +117,18 @@ inline void audioQueue<T,U>::usageRefresh()
 template<typename T, typename U>
 bool audioQueue<T,U>::push(const T* ptr, size_t frames)
 {
-    size_t size = frames * channelNum;
-    std::print("                                                                                    Thread 1 : current usage : {}%, estimated usage after push operation: {}%\n", usage.load(), usage.load() + (size * 100 / capacity));
-    if (usage.load() + (size * 100 /capacity) >= upperThreshold)
+    const auto size = frames * channelNum;
+    const auto estimatedUsage = usage.load() + (size * 100 / capacity);
+
+    std::print("                                                                                    Thread 1 : current usage : {}%, estimated usage after push operation: {}%\n", usage.load(), estimatedUsage);
+    if (estimatedUsage >= upperThreshold)
     {
         std::print("                                                                                    Thread 1 : Input Delay Called\n");
-        std::this_thread::sleep_for(std::chrono::milliseconds(delayTime-3));
+        std::this_thread::sleep_for(std::chrono::milliseconds(inputDelay));
         std::print("                                                                                    Thread 1 : Input Delay ended\n");
     }
     std::print("                                                                                    Thread 1 : Push operation started\n");
-    std::print("                                                                                    Thread 1 : usage after delay: {}%, estimated usage after push operation: {}%\n", usage.load(), usage.load() + (size * 100 / capacity));
+    std::print("                                                                                    Thread 1 : usage after delay: {}%, estimated usage after push operation: {}%\n", usage.load(), estimatedUsage);
     for (auto i = 0; i < size; i++)
     {
         if (!(this->enqueue(ptr[i])))
@@ -143,18 +147,20 @@ bool audioQueue<T,U>::push(const T* ptr, size_t frames)
 template<typename T, typename U>
 void audioQueue<T,U>::pop(T*& ptr, size_t frames)
 {   
-    size_t size = frames * channelNum;
-    size_t estimatedUsage = usage.load() >= (size * 100 / capacity) ? usage.load() - (size * 100 / capacity) : 0;
+    const auto size = frames * channelNum;
+    const auto estimatedUsage = usage.load() >= (size * 100 / capacity) ? usage.load() - (size * 100 / capacity) : 0;
+
     std::print("Thread 2 : current usage : {}%, estimated usage after pop operation: {}%\n", usage.load(), estimatedUsage);
+
     if (estimatedUsage <= lowerThreshold)
     {
         std::print("Thread 2 : Output Delay Called\n");
-        std::this_thread::sleep_for(std::chrono::milliseconds(delayTime));
+        std::this_thread::sleep_for(std::chrono::milliseconds(outputDelay));
     }
 
     if (size > elementCount.load()) std::print("Warning : there is only {} elements in the queue, {} demanded.\n", elementCount.load(), size);
 
-    for (size_t i = 0; i < size; i++)
+    for (auto i = 0; i < size; i++)
     {
         if(!this->dequeue(ptr[i])) break;
     }
@@ -168,7 +174,6 @@ inline void audioQueue<T,U>::setCapacity(size_t newCapacity)
     else
     {
         if (this->size()) this->clear();
-
         queue.resize(newCapacity);
         capacity = newCapacity;
         std::print("current capacity : {}\n", capacity);
@@ -177,18 +182,17 @@ inline void audioQueue<T,U>::setCapacity(size_t newCapacity)
 }
 
 template<typename T, typename U>
-inline void audioQueue<T,U>::setDelay(const uint8_t lower, const uint8_t upper, const size_t time)
+inline void audioQueue<T,U>::setDelay(const uint8_t lower, const uint8_t upper, const size_t iDelay, const size_t oDelay)
 {
     auto isInRange = [](const uint8_t val) { return val >= 0 && val <= 100; };
-    
     if (isInRange(lowerThreshold) && isInRange(upperThreshold))
     {
         lowerThreshold = lower;
         upperThreshold = upper;
-        delayTime = time;
+        inputDelay     = iDelay;
+        outputDelay    = oDelay;
     }
-    else
-        std::print("The upper and lower threshold must between 0% and 100% !");
+    else std::print("The upper and lower threshold must between 0% and 100% ! Threshold not set. ");
 }
 
 #endif// audioQueue_H

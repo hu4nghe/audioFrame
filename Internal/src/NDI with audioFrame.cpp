@@ -1,5 +1,4 @@
-﻿#include <thread>
-#include <csignal>
+﻿#include <csignal>
 
 #include "Processing.NDI.Lib.h" 
 #include "portaudio.h"
@@ -7,9 +6,7 @@
 
 // System signal catch handler
 static std::atomic<bool> exit_loop(false);
-static void sigIntHandler(int) { exit_loop = true; }
-
-
+static void sigIntHandler(int) {exit_loop = true;}
 
 constexpr auto SAMPLE_RATE					= 44100;
 constexpr auto PA_BUFFER_SIZE				= 128;
@@ -19,8 +16,8 @@ constexpr auto QUEUE_SIZE_MULTIPLIER		= 1.2;
 audioQueue<float> data(0);
 
 template <typename T>
-inline T*	NDIErrorCheck	(T* ptr) {if (ptr == nullptr){ std::print("Error: Received nullptr.\n"); exit(EXIT_FAILURE); } else{ return ptr; }}
-inline void PAErrorCheck	(PaError err){if (err != paNoError){ std::print("PortAudio error : {}.\n", Pa_GetErrorText(err)); exit(EXIT_FAILURE);}}
+inline T*	NDIErrorCheck (T*	   ptr){if (!ptr){ std::print("Error: Received nullptr.\n"); exit(EXIT_FAILURE); } else{ return ptr; }}
+inline void  PAErrorCheck (PaError err){if ( err){ std::print("PortAudio error : {}.\n", Pa_GetErrorText(err)); exit(EXIT_FAILURE);}}
 
 void NDIAudioTread()
 {
@@ -53,10 +50,10 @@ void NDIAudioTread()
 	/*NDI data capture loop*/
 
 	NDIlib_audio_frame_v2_t audioInput;
-
+	 
 	while (!exit_loop)
 	{
-		// Capture NDI data
+		// Capture NDI datae
 		auto NDI_frame_type = NDIlib_recv_capture_v2(pNDI_recv, nullptr, &audioInput, nullptr, NDI_TIMEOUT);
 		if (NDI_frame_type == NDIlib_frame_type_audio)
 		{
@@ -67,10 +64,11 @@ void NDIAudioTread()
 			audioDataNDI.p_data = new float[dataSize];
 			NDIlib_util_audio_to_interleaved_32f_v2(&audioInput, &audioDataNDI);
 			
-			if(audioInput.no_channels != data.channels())	data.setChannelNum	(audioInput.no_channels);
+			if(audioInput.no_channels != data.channels  ())	data.setChannelNum	(audioInput.no_channels);
 			if(audioInput.sample_rate != data.sampleRate()) data.setSampleRate	(audioInput.sample_rate);
-			data.setCapacity	(static_cast<size_t>(dataSize * QUEUE_SIZE_MULTIPLIER));
-			data.push			(audioDataNDI.p_data, audioInput.no_samples);
+			data.setCapacity (static_cast<size_t>(dataSize * QUEUE_SIZE_MULTIPLIER));
+
+			data.push(audioDataNDI.p_data, audioInput.no_samples);
 
 			delete[] audioDataNDI.p_data;
 		}
