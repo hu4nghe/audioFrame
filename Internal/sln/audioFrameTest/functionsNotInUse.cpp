@@ -65,8 +65,10 @@ static int sndfileAudioCallback(const void* inputBuffer,
 	return paContinue;
 }
 */
-//in pa thread
-/* test : sndfile and microphone input
+
+
+/*SNDFILE WITH MICROPHONE TEST*/
+/*
 	SndfileHandle sndFile("D:/Music/Mahler Symphony No.2/Mahler- Symphony #2 In C Minor, 'Resurrection' - 5g. Mit Aufschwung Aber Nicht Eilen.wav");
 	PaStream* sndfileStream;
 	PAErrorCheck(Pa_OpenDefaultStream(&sndfileStream, 0, 2, paFloat32, SAMPLE_RATE, 128, sndfileAudioCallback, &sndFile));
@@ -84,21 +86,17 @@ static int sndfileAudioCallback(const void* inputBuffer,
 	PAErrorCheck(Pa_StopStream(microStream));
 	PAErrorCheck(Pa_CloseStream(sndfileStream));
 	PAErrorCheck(Pa_CloseStream(microStream));
-	
-	
-	*/
+*/
 
 
+/*DEBUG TOOL CODE DURATION CHECK*/
+/*
+	auto start = std::chrono::high_resolution_clock::now();
+	std::cout << "Initialize time : " << std::chrono::duration_cast<std::chrono::microseconds>(std::chrono::high_resolution_clock::now() - start).count() << " microseconds." << std::endl;
+*/
 
-//duration check
-	/*auto start = std::chrono::high_resolution_clock::now();
-				std::cout << "Initialize time : " << std::chrono::duration_cast<std::chrono::microseconds>(std::chrono::high_resolution_clock::now() - start).count() << " microseconds." << std::endl;*/
 
-/*template <typename T>
-void NDIErrorCheck(T* ptr)
-{
-
-}*/
+/*FULL NDI ERROR HANDLE FUNCTION*/
 /*
 template <typename T>
 auto NDIErrorCheck(T* err) -> decltype(err)
@@ -134,3 +132,30 @@ auto NDIErrorCheck(T* err) -> decltype(err)
 	else
 		exit(EXIT_FAILURE);
 }*/
+
+
+/*SNDFILE READ*/
+/*
+bool readSoundFile(const fs::path filePath);
+template<typename T, typename U>
+inline bool audioQueue<T, U>::readSoundFile(const fs::path filePath)
+{
+	SndfileHandle soundFile(filePath.string(), SFM_READ);
+	audioSampleRate = soundFile.samplerate();
+	channelNum = soundFile.channels();
+	queue.resize(soundFile.frames() * channelNum);
+	queue.size() = queue.size();
+	soundFile.read(queue.data(), int(soundFile.frames() * channelNum));
+	return true;
+}
+*/
+
+
+/*NDI METADATA*/
+/*else if (NDI_frame_type == NDIlib_frame_type_metadata)
+{
+	NDIlib_recv_free_metadata(pNDI_recv, &metadata_frame);
+	std::string meta(metadata_frame.p_data,metadata_frame.length);
+	std::print("the metainfo is : {}",meta);
+}
+*/

@@ -1,31 +1,35 @@
 ﻿#include <csignal>
-
 #include "Processing.NDI.Lib.h" 
 #include "portaudio.h"
 #include "audioFrame.h"
-#include <conio.h>
 
-// System signal catch handler
+#pragma region Signal Catcher
+
 static std::atomic<bool> exit_loop(false);
 static void sigIntHandler(int) {exit_loop = true;}
+#pragma endregion
 
+#pragma region GlbVar definition
 constexpr auto SAMPLE_RATE					= 44100;
 constexpr auto PA_BUFFER_SIZE				= 128;
 constexpr auto NDI_TIMEOUT					= 1000;
-constexpr auto QUEUE_SIZE_MULTIPLIER		= 1.3;
+constexpr auto QUEUE_SIZE_MULTIPLIER		= 1.75;
 
 audioQueue<float> data(0);
+#pragma endregion
+
+#pragma region Error Handlers
 
 template <typename T>
 inline T*	NDIErrorCheck (T*	   ptr){if (!ptr){ std::print("NDI Error: No source is found.\n"); exit(EXIT_FAILURE); } else{ return ptr; }}
 inline void  PAErrorCheck (PaError err){if ( err){ std::print("PortAudio error : {}.\n", Pa_GetErrorText(err)); exit(EXIT_FAILURE);}}
+#pragma endregion
 
 void NDIAudioTread()
 {
 	std::signal(SIGINT, sigIntHandler);
 
-	///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-	/*Preparation phase*/
+#pragma region NDI Initialization
 
 	NDIlib_initialize();
 	// Create a NDI finder and try to find a source NDI 
@@ -46,9 +50,9 @@ void NDIAudioTread()
 
 	auto pNDI_recv = NDIErrorCheck(NDIlib_recv_create_v3(&NDIRecvCreateDesc));
 	NDIlib_find_destroy(pNDIFind);
-
-	///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-	/*NDI data capture loop*/
+#pragma endregion
+	
+#pragma region NDI Data capture loop
 
 	NDIlib_audio_frame_v2_t audioInput;
 	 
@@ -56,7 +60,7 @@ void NDIAudioTread()
 	{
 		// Capture NDI datae
 		auto NDI_frame_type = NDIlib_recv_capture_v2(pNDI_recv, nullptr, &audioInput, nullptr, NDI_TIMEOUT);
-		if (NDI_frame_type == NDIlib_frame_type_audio)
+		if(NDI_frame_type == NDIlib_frame_type_audio)
 		{
 			const size_t dataSize = audioInput.no_samples * audioInput.no_channels;
 
@@ -64,22 +68,25 @@ void NDIAudioTread()
 			NDIlib_audio_frame_interleaved_32f_t audioDataNDI;
 			audioDataNDI.p_data = new float[dataSize];
 			NDIlib_util_audio_to_interleaved_32f_v2(&audioInput, &audioDataNDI);
-			
-			if(audioInput.no_channels != data.channels  ())	data.setChannelNum	(audioInput.no_channels);
-			if(audioInput.sample_rate != data.sampleRate()) data.setSampleRate	(audioInput.sample_rate);
+			NDIlib_recv_free_audio_v2(pNDI_recv, &audioInput);
+
+			if(audioDataNDI.no_channels != data.channels  ()) data.setChannelNum(audioDataNDI.no_channels);
+			if(audioDataNDI.sample_rate != data.sampleRate()) data.setSampleRate(audioDataNDI.sample_rate);
 			data.setCapacity (static_cast<size_t>(dataSize * QUEUE_SIZE_MULTIPLIER));
 
-			data.push(audioDataNDI.p_data, audioInput.no_samples);
+			data.push(audioDataNDI.p_data, audioDataNDI.no_samples);
 
 			delete[] audioDataNDI.p_data;
 		}
+		
 	}
-
-	///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-	/*NDI Clean up*/
-
+#pragma endregion
+	
+#pragma region NDI Clean up
+	
 	NDIlib_recv_destroy(pNDI_recv);
 	NDIlib_destroy();
+#pragma endregion
 }
 
 static int portAudioOutputCallback(const void* inputBuffer, 
@@ -93,11 +100,15 @@ static int portAudioOutputCallback(const void* inputBuffer,
 	auto out = static_cast<float*>(outputBuffer);
 
 	data.pop(out, framesPerBuffer);
-	
+
+#pragma region Micro in
+
 	for (auto i = 0; i < framesPerBuffer * 2; i++)
 	{
-		out[i] += in[i]*3;
+		out[i] += in[i] * 3;
 	}
+#pragma endregion
+
 	return paContinue;
 }
 
@@ -105,8 +116,9 @@ void portAudioOutputThread()
 {
 	std::signal(SIGINT, sigIntHandler);
 
-	PaStream* streamOut;
+#pragma region PA Initialization
 
+	PaStream* streamOut;
 	PAErrorCheck(Pa_Initialize			());
 	PAErrorCheck(Pa_OpenDefaultStream	(&streamOut,					// PaStream ptr
 										 2,								// Input  channels
@@ -118,6 +130,9 @@ void portAudioOutputThread()
 										 nullptr));						// No user data passed
 
 	PAErrorCheck(Pa_StartStream			(streamOut));
+#pragma endregion
+
+#pragma region PA Callback playing loop
 
 	std::print("playing...\n");
 	while (!exit_loop)
@@ -125,10 +140,14 @@ void portAudioOutputThread()
 		if (!data.size()) Pa_AbortStream(streamOut);
 		if (data.size() && Pa_IsStreamStopped(streamOut)) Pa_StartStream(streamOut);
 	}
+#pragma endregion
+
+#pragma region PA Clean up
 
 	PAErrorCheck(Pa_StopStream	(streamOut));
 	PAErrorCheck(Pa_CloseStream	(streamOut));
 	PAErrorCheck(Pa_Terminate	());
+#pragma endregion
 }
 
 int main()
