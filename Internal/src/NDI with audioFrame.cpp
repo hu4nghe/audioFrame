@@ -3,6 +3,7 @@
 #include "Processing.NDI.Lib.h" 
 #include "portaudio.h"
 #include "audioFrame.h"
+#include <conio.h>
 
 // System signal catch handler
 static std::atomic<bool> exit_loop(false);
@@ -11,12 +12,12 @@ static void sigIntHandler(int) {exit_loop = true;}
 constexpr auto SAMPLE_RATE					= 44100;
 constexpr auto PA_BUFFER_SIZE				= 128;
 constexpr auto NDI_TIMEOUT					= 1000;
-constexpr auto QUEUE_SIZE_MULTIPLIER		= 1.2;
+constexpr auto QUEUE_SIZE_MULTIPLIER		= 1.3;
 
 audioQueue<float> data(0);
 
 template <typename T>
-inline T*	NDIErrorCheck (T*	   ptr){if (!ptr){ std::print("Error: Received nullptr.\n"); exit(EXIT_FAILURE); } else{ return ptr; }}
+inline T*	NDIErrorCheck (T*	   ptr){if (!ptr){ std::print("NDI Error: No source is found.\n"); exit(EXIT_FAILURE); } else{ return ptr; }}
 inline void  PAErrorCheck (PaError err){if ( err){ std::print("PortAudio error : {}.\n", Pa_GetErrorText(err)); exit(EXIT_FAILURE);}}
 
 void NDIAudioTread()

@@ -65,7 +65,7 @@ template<typename T, typename U>
 inline audioQueue<T, U>::audioQueue(const size_t initialCapacity)
     : capacity(initialCapacity), queue(capacity), head(0), tail(0),
       audioSampleRate(0), channelNum(0), elementCount(0), usage(0),
-      lowerThreshold(5), upperThreshold(75), inputDelay(45), outputDelay(15) {}
+      lowerThreshold(5), upperThreshold(60), inputDelay(45), outputDelay(15) {}
 
 // Private member functions ///////////////////////////////////////////////////////////////////////////// 
 
@@ -128,7 +128,7 @@ bool audioQueue<T,U>::push(const T* ptr, size_t frames)
         std::print("                                                                                    Thread 1 : Input Delay ended\n");
     }
     std::print("                                                                                    Thread 1 : Push operation started\n");
-    std::print("                                                                                    Thread 1 : usage after delay: {}%, estimated usage after push operation: {}%\n", usage.load(), estimatedUsage);
+    std::print("                                                                                    Thread 1 : usage after delay: {}%, estimated usage after push operation: {}%\n", usage.load(), usage.load() + (size * 100 / capacity));
     for (auto i = 0; i < size; i++)
     {
         if (!(this->enqueue(ptr[i])))
