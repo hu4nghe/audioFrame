@@ -58,15 +58,16 @@ class audioQueue
     inline       size_t size            () const { return elementCount.load(); }
 };
 
-// Constructor ////////////////////////////////////////////////////////////////////////////////////////// 
+#pragma region Constructors
 
 template<typename T, typename U>
 inline audioQueue<T, U>::audioQueue(const size_t initialCapacity)
     : queue(initialCapacity), head(0), tail(0),usage(0), audioSampleRate(0),
       channelNum(0),  elementCount(0), lowerThreshold(5), upperThreshold(60), 
       inputDelay(45), outputDelay(15) {}
+#pragma endregion
 
-// Private member functions ///////////////////////////////////////////////////////////////////////////// 
+#pragma region Private member functions
 
 template<typename T, typename U>
 bool audioQueue<T,U>::enqueue(const T& value)
@@ -110,8 +111,9 @@ inline void audioQueue<T,U>::usageRefresh()
 {
     usage.store(static_cast<uint8_t>(static_cast<double>(elementCount.load()) / queue.size() * 100.0));
 }
+#pragma endregion
 
-// Public APIs //////////////////////////////////////////////////////////////////////////////////////////
+#pragma region Public APIs
 
 template<typename T, typename U>
 bool audioQueue<T,U>::push(const T* ptr, size_t frames)
@@ -212,5 +214,6 @@ inline void audioQueue<T,U>::setDelay(const uint8_t lower, const uint8_t upper, 
     }
     else std::print("The upper and lower threshold must between 0% and 100% ! Threshold not set. ");
 }
+#pragma endregion
 
 #endif// audioQueue_H
