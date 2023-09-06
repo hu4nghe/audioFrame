@@ -63,7 +63,7 @@ class audioQueue
 template<typename T, typename U>
 inline audioQueue<T, U>::audioQueue(const size_t initialCapacity)
     : queue(initialCapacity), head(0), tail(0),usage(0), audioSampleRate(0),
-      channelNum(0),  elementCount(0), lowerThreshold(5), upperThreshold(60), 
+      channelNum(0),  elementCount(0), lowerThreshold(20), upperThreshold(80), 
       inputDelay(45), outputDelay(15) {}
 #pragma endregion
 

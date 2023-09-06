@@ -3,23 +3,35 @@
 #include "portaudio.h"
 #include "audioFrame.h"
 
-#pragma region Signal Catcher
-
+/**
+ * @brief A system signal handler allows to quit with Crtl + C
+ * 
+ * Let exit_loop = true if a system signal is received.
+ */
+#pragma region Signal handler
 static std::atomic<bool> exit_loop(false);
 static void sigIntHandler(int) {exit_loop = true;}
 #pragma endregion
 
-#pragma region GlbVar definition
+/**
+ * @brief Global variables definition
+ * 
+ * Constants and data queue.
+ */
+#pragma region Global definition
 constexpr auto SAMPLE_RATE					= 44100;
 constexpr auto PA_BUFFER_SIZE				= 128;
 constexpr auto NDI_TIMEOUT					= 1000;
 constexpr auto QUEUE_SIZE_MULTIPLIER		= 1.75;
-
 audioQueue<float> data(0);
 #pragma endregion
 
+/**
+ * @brief Error checker for NDI and PortAudio library.
+ * 
+ * Exit with failure in case of error.
+ */
 #pragma region Error Handlers
-
 template <typename T>
 inline T*	NDIErrorCheck (T*	   ptr){if (!ptr){ std::print("NDI Error: No source is found.\n"); exit(EXIT_FAILURE); } else{ return ptr; }}
 inline void  PAErrorCheck (PaError err){if ( err){ std::print("PortAudio error : {}.\n", Pa_GetErrorText(err)); exit(EXIT_FAILURE);}}
@@ -29,8 +41,7 @@ void NDIAudioTread()
 {
 	std::signal(SIGINT, sigIntHandler);
 
-#pragma region NDI Initialization
-
+	#pragma region NDI Initialization
 	NDIlib_initialize();
 	// Create a NDI finder and try to find a source NDI 
 	const NDIlib_find_create_t NDIFindCreateDesc;
@@ -50,10 +61,9 @@ void NDIAudioTread()
 
 	auto pNDI_recv = NDIErrorCheck(NDIlib_recv_create_v3(&NDIRecvCreateDesc));
 	NDIlib_find_destroy(pNDIFind);
-#pragma endregion
+	#pragma endregion
 	
-#pragma region NDI Data capture loop
-
+	#pragma region NDI Data capture
 	NDIlib_audio_frame_v2_t audioInput;
 	 
 	while (!exit_loop)
@@ -80,13 +90,12 @@ void NDIAudioTread()
 		}
 		
 	}
-#pragma endregion
+	#pragma endregion
 	
-#pragma region NDI Clean up
-	
+	#pragma region NDI Clean up
 	NDIlib_recv_destroy(pNDI_recv);
 	NDIlib_destroy();
-#pragma endregion
+	#pragma endregion
 }
 
 static int portAudioOutputCallback(const void* inputBuffer, 
@@ -96,19 +105,16 @@ static int portAudioOutputCallback(const void* inputBuffer,
 								   PaStreamCallbackFlags statusFlags,
 								   void* userData)
 {
-	auto in = static_cast<const float*>(inputBuffer);
+	
 	auto out = static_cast<float*>(outputBuffer);
-
 	data.pop(out, framesPerBuffer);
-
-#pragma region Micro in
-
+	
+	auto in = static_cast<const float*>(inputBuffer);
 	for (auto i = 0; i < framesPerBuffer * 2; i++)
 	{
 		out[i] += in[i] * 3;
 	}
-#pragma endregion
-
+	
 	return paContinue;
 }
 
