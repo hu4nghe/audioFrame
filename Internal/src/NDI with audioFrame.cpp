@@ -23,7 +23,7 @@ constexpr auto SAMPLE_RATE					= 44100;
 constexpr auto PA_BUFFER_SIZE				= 128;
 constexpr auto NDI_TIMEOUT					= 1000;
 constexpr auto QUEUE_SIZE_MULTIPLIER		= 1.75;
-audioQueue<float> data(0);
+audioQueue<float> NDIdata(0);
 #pragma endregion
 
 /**
@@ -80,11 +80,11 @@ void NDIAudioTread()
 			NDIlib_util_audio_to_interleaved_32f_v2(&audioInput, &audioDataNDI);
 			NDIlib_recv_free_audio_v2(pNDI_recv, &audioInput);
 
-			if(audioDataNDI.no_channels != data.channels  ()) data.setChannelNum(audioDataNDI.no_channels);
-			if(audioDataNDI.sample_rate != data.sampleRate()) data.setSampleRate(audioDataNDI.sample_rate);
-			data.setCapacity (static_cast<std::size_t>(dataSize * QUEUE_SIZE_MULTIPLIER));
+			if(audioDataNDI.no_channels != NDIdata.channels  ()) NDIdata.setChannelNum(audioDataNDI.no_channels);
+			if(audioDataNDI.sample_rate != NDIdata.sampleRate()) NDIdata.setSampleRate(audioDataNDI.sample_rate);
+			NDIdata.setCapacity (static_cast<std::size_t>(dataSize * QUEUE_SIZE_MULTIPLIER));
 
-			data.push(audioDataNDI.p_data, audioDataNDI.no_samples);
+			NDIdata.push(audioDataNDI.p_data, audioDataNDI.no_samples);
 
 			delete[] audioDataNDI.p_data;
 		}
@@ -107,7 +107,7 @@ static int portAudioOutputCallback(const void* inputBuffer,
 {
 	
 	auto out = static_cast<float*>(outputBuffer);
-	data.pop(out, framesPerBuffer);
+	NDIdata.pop(out, framesPerBuffer);
 	
 	auto in = static_cast<const float*>(inputBuffer);
 	for (auto i = 0; i < framesPerBuffer * 2; i++)
@@ -133,7 +133,7 @@ void portAudioOutputThread()
 									     SAMPLE_RATE,					// 44100
 										 PA_BUFFER_SIZE,				// 128
 										 portAudioOutputCallback,		// Callback function called
-										 nullptr));						// No user data passed
+										 nullptr));						// No user NDIdata passed
 
 	PAErrorCheck(Pa_StartStream			(streamOut));
 #pragma endregion
@@ -143,8 +143,8 @@ void portAudioOutputThread()
 	std::print("playing...\n");
 	while (!exit_loop)
 	{
-		if (!data.size()) Pa_AbortStream(streamOut);
-		if (data.size() && Pa_IsStreamStopped(streamOut)) Pa_StartStream(streamOut);
+		if (!NDIdata.size()) Pa_AbortStream(streamOut);
+		if (NDIdata.size() && Pa_IsStreamStopped(streamOut)) Pa_StartStream(streamOut);
 	}
 #pragma endregion
 

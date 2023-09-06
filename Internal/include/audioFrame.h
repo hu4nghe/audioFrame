@@ -119,25 +119,25 @@ bool audioQueue<T,U>::push(const T* ptr, std::size_t frames)
     const auto estimatedUsage = usage.load() + (size * 100 / queue.size());
 
     #ifdef DEBUG_MODE
-    std::print("                                                                                    Thread 1 : current usage : {}%, estimated usage after push operation: {}%\n", usage.load(), estimatedUsage);
+    std::print("                                                                                    NDI  : current usage : {}%, estimated usage after push operation: {}%\n", usage.load(), estimatedUsage);
     #endif
 
     if (estimatedUsage >= upperThreshold)
     {
         #ifdef DEBUG_MODE
-        std::print("                                                                                    Thread 1 : Input Delay Called\n");
+        std::print("                                                                                    NDI  : Input Delay Called\n");
         #endif
 
         std::this_thread::sleep_for(std::chrono::milliseconds(inputDelay));
 
         #ifdef DEBUG_MODE
-        std::print("                                                                                    Thread 1 : Input Delay ended\n");
+        std::print("                                                                                    NDI  : Input Delay ended\n");
         #endif
     }
 
     #ifdef DEBUG_MODE
-    std::print("                                                                                    Thread 1 : Push operation started\n");
-    std::print("                                                                                    Thread 1 : usage after delay: {}%, estimated usage after push operation: {}%\n", usage.load(), usage.load() + (size * 100 / queue.size()));
+    std::print("                                                                                    NDI  : Push operation started\n");
+    std::print("                                                                                    NDI  : usage after delay: {}%, estimated usage after push operation: {}%\n", usage.load(), usage.load() + (size * 100 / queue.size()));
     #endif
 
     for (auto i = 0; i < size; i++)
@@ -145,7 +145,7 @@ bool audioQueue<T,U>::push(const T* ptr, std::size_t frames)
         if (!(this->enqueue(ptr[i])))
         {
             usageRefresh();
-            std::print("                                                                                    Thread 1 : push operation aborted : not enough space\n");
+            std::print("                                                                                    NDI  : push operation aborted : not enough space\n");
             return false;
         }
         
@@ -153,7 +153,7 @@ bool audioQueue<T,U>::push(const T* ptr, std::size_t frames)
     usageRefresh();
 
     #ifdef DEBUG_MODE
-    std::print("                                                                                    Thread 1 : push sucess\n");
+    std::print("                                                                                    NDI  : push sucess\n");
     #endif
 
     return true;
@@ -165,12 +165,12 @@ void audioQueue<T,U>::pop(T*& ptr, std::size_t frames)
     const auto size = frames * channelNum;
     const auto estimatedUsage = usage.load() >= (size * 100 / queue.size()) ? usage.load() - (size * 100 / queue.size()) : 0;
     #ifdef DEBUG_MODE
-    std::print("Thread 2 : current usage : {}%, estimated usage after pop operation: {}%\n", usage.load(), estimatedUsage);
+    std::print("PortAudio : current usage : {}%, estimated usage after pop operation: {}%\n", usage.load(), estimatedUsage);
     #endif
     if (estimatedUsage <= lowerThreshold)
     {
     #ifdef DEBUG_MODE
-        std::print("Thread 2 : Output Delay Called\n");
+        std::print("PortAudio : Output Delay Called\n");
     #endif
 
         std::this_thread::sleep_for(std::chrono::milliseconds(outputDelay));
