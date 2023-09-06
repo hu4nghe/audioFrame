@@ -38,7 +38,7 @@ class audioQueue
                              audioQueue      () = default;
                              audioQueue      (const  std::size_t  initialCapacity);
 
-                       bool  push            (const           T*  ptr, 
+                       void  push            (const           T*  ptr, 
                                               const  std::size_t  frames);
                        void  pop             (                T* &ptr, 
                                               const  std::size_t  frames);                
@@ -113,50 +113,23 @@ inline void audioQueue<T,U>::usageRefresh()
 
 #pragma region Public APIs
 template<typename T, typename U>
-bool audioQueue<T,U>::push(const T* ptr, std::size_t frames)
+void audioQueue<T,U>::push(const T* ptr, std::size_t frames)
 {
     const auto size = frames * channelNum;
     const auto estimatedUsage = usage.load() + (size * 100 / queue.size());
 
-    #ifdef DEBUG_MODE
-    std::print("                                                                                    NDI  : current usage : {}%, estimated usage after push operation: {}%\n", usage.load(), estimatedUsage);
-    #endif
-
-    if (estimatedUsage >= upperThreshold)
-    {
-        #ifdef DEBUG_MODE
-        std::print("                                                                                    NDI  : Input Delay Called\n");
-        #endif
-
-        std::this_thread::sleep_for(std::chrono::milliseconds(inputDelay));
-
-        #ifdef DEBUG_MODE
-        std::print("                                                                                    NDI  : Input Delay ended\n");
-        #endif
-    }
-
-    #ifdef DEBUG_MODE
-    std::print("                                                                                    NDI  : Push operation started\n");
-    std::print("                                                                                    NDI  : usage after delay: {}%, estimated usage after push operation: {}%\n", usage.load(), usage.load() + (size * 100 / queue.size()));
-    #endif
+    if (estimatedUsage >= upperThreshold) std::this_thread::sleep_for(std::chrono::milliseconds(inputDelay));
 
     for (auto i = 0; i < size; i++)
     {
         if (!(this->enqueue(ptr[i])))
         {
-            usageRefresh();
-            std::print("                                                                                    NDI  : push operation aborted : not enough space\n");
-            return false;
+            std::print("Warning : push operation aborted, not enough space. {} elements are pushed.\n",i);
+            break;
         }
         
     }
     usageRefresh();
-
-    #ifdef DEBUG_MODE
-    std::print("                                                                                    NDI  : push sucess\n");
-    #endif
-
-    return true;
 }
 
 template<typename T, typename U>
@@ -164,23 +137,16 @@ void audioQueue<T,U>::pop(T*& ptr, std::size_t frames)
 {   
     const auto size = frames * channelNum;
     const auto estimatedUsage = usage.load() >= (size * 100 / queue.size()) ? usage.load() - (size * 100 / queue.size()) : 0;
-    #ifdef DEBUG_MODE
-    std::print("PortAudio : current usage : {}%, estimated usage after pop operation: {}%\n", usage.load(), estimatedUsage);
-    #endif
-    if (estimatedUsage <= lowerThreshold)
-    {
-    #ifdef DEBUG_MODE
-        std::print("PortAudio : Output Delay Called\n");
-    #endif
-
-        std::this_thread::sleep_for(std::chrono::milliseconds(outputDelay));
-    }
-
-    if (size > elementCount.load()) std::print("Warning : there is only {} elements in the queue, {} demanded.\n", elementCount.load(), size);
+    
+    if (estimatedUsage <= lowerThreshold) std::this_thread::sleep_for(std::chrono::milliseconds(outputDelay));
 
     for (auto i = 0; i < size; i++)
     {
-        if(!this->dequeue(ptr[i])) break;
+        if (!this->dequeue(ptr[i])) 
+        {
+            std::print("Warning : there is only {} elements were poped, {} demanded.\n", i, size);
+            break;
+        }
     }
     usageRefresh();
 }
@@ -193,8 +159,6 @@ inline void audioQueue<T,U>::setCapacity(std::size_t newCapacity)
     {
         if (this->size()) this->clear();
         queue.resize(newCapacity);
-        std::print("Current data :\n    Channels : {},\n    Sample rate : {}\n", channelNum, audioSampleRate);
-        return;
     }
 }
 
