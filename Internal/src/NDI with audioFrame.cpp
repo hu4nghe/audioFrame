@@ -72,7 +72,7 @@ void NDIAudioTread()
 		auto NDI_frame_type = NDIlib_recv_capture_v2(pNDI_recv, nullptr, &audioInput, nullptr, NDI_TIMEOUT);
 		if(NDI_frame_type == NDIlib_frame_type_audio)
 		{
-			const size_t dataSize = audioInput.no_samples * audioInput.no_channels;
+			const std::size_t dataSize = audioInput.no_samples * audioInput.no_channels;
 
 			// Create a NDI audio object and convert it to interleaved float format.
 			NDIlib_audio_frame_interleaved_32f_t audioDataNDI;
@@ -82,7 +82,7 @@ void NDIAudioTread()
 
 			if(audioDataNDI.no_channels != data.channels  ()) data.setChannelNum(audioDataNDI.no_channels);
 			if(audioDataNDI.sample_rate != data.sampleRate()) data.setSampleRate(audioDataNDI.sample_rate);
-			data.setCapacity (static_cast<size_t>(dataSize * QUEUE_SIZE_MULTIPLIER));
+			data.setCapacity (static_cast<std::size_t>(dataSize * QUEUE_SIZE_MULTIPLIER));
 
 			data.push(audioDataNDI.p_data, audioDataNDI.no_samples);
 

@@ -1,5 +1,5 @@
 /*
-   bool resample(size_t targetSampleRate)
+   bool resample(std::size_t targetSampleRate)
    {
        SRC_STATE *srcState = src_new(SRC_SINC_BEST_QUALITY, channelNum, nullptr);
 
