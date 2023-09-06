@@ -98,12 +98,12 @@ void NDIAudioTread()
 	#pragma endregion
 }
 
-static int portAudioOutputCallback(const void* inputBuffer, 
-								   void* outputBuffer,
-								   unsigned long framesPerBuffer,
+static int portAudioOutputCallback(const void*					   inputBuffer, 
+										 void*					   outputBuffer,
+										 unsigned long             framesPerBuffer,
 								   const PaStreamCallbackTimeInfo* timeInfo,
-								   PaStreamCallbackFlags statusFlags,
-								   void* userData)
+										 PaStreamCallbackFlags	   statusFlags,
+										 void*					   UserData)
 {
 	
 	auto out = static_cast<float*>(outputBuffer);
