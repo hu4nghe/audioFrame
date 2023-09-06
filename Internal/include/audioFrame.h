@@ -59,7 +59,6 @@ class audioQueue
 };
 
 #pragma region Constructors
-
 template<typename T, typename U>
 inline audioQueue<T, U>::audioQueue(const size_t initialCapacity)
     : queue(initialCapacity), head(0), tail(0),usage(0), audioSampleRate(0),
@@ -68,7 +67,6 @@ inline audioQueue<T, U>::audioQueue(const size_t initialCapacity)
 #pragma endregion
 
 #pragma region Private member functions
-
 template<typename T, typename U>
 bool audioQueue<T,U>::enqueue(const T& value)
 {
@@ -114,34 +112,33 @@ inline void audioQueue<T,U>::usageRefresh()
 #pragma endregion
 
 #pragma region Public APIs
-
 template<typename T, typename U>
 bool audioQueue<T,U>::push(const T* ptr, size_t frames)
 {
     const auto size = frames * channelNum;
     const auto estimatedUsage = usage.load() + (size * 100 / queue.size());
 
-#ifdef DEBUG_MODE
+    #ifdef DEBUG_MODE
     std::print("                                                                                    Thread 1 : current usage : {}%, estimated usage after push operation: {}%\n", usage.load(), estimatedUsage);
-#endif
+    #endif
 
     if (estimatedUsage >= upperThreshold)
     {
-#ifdef DEBUG_MODE
+        #ifdef DEBUG_MODE
         std::print("                                                                                    Thread 1 : Input Delay Called\n");
-#endif
+        #endif
 
         std::this_thread::sleep_for(std::chrono::milliseconds(inputDelay));
 
-#ifdef DEBUG_MODE
+        #ifdef DEBUG_MODE
         std::print("                                                                                    Thread 1 : Input Delay ended\n");
-#endif
+        #endif
     }
 
-#ifdef DEBUG_MODE
+    #ifdef DEBUG_MODE
     std::print("                                                                                    Thread 1 : Push operation started\n");
     std::print("                                                                                    Thread 1 : usage after delay: {}%, estimated usage after push operation: {}%\n", usage.load(), usage.load() + (size * 100 / queue.size()));
-#endif
+    #endif
 
     for (auto i = 0; i < size; i++)
     {
@@ -155,9 +152,9 @@ bool audioQueue<T,U>::push(const T* ptr, size_t frames)
     }
     usageRefresh();
 
-#ifdef DEBUG_MODE
+    #ifdef DEBUG_MODE
     std::print("                                                                                    Thread 1 : push sucess\n");
-#endif
+    #endif
 
     return true;
 }
@@ -167,14 +164,14 @@ void audioQueue<T,U>::pop(T*& ptr, size_t frames)
 {   
     const auto size = frames * channelNum;
     const auto estimatedUsage = usage.load() >= (size * 100 / queue.size()) ? usage.load() - (size * 100 / queue.size()) : 0;
-#ifdef DEBUG_MODE
+    #ifdef DEBUG_MODE
     std::print("Thread 2 : current usage : {}%, estimated usage after pop operation: {}%\n", usage.load(), estimatedUsage);
-#endif
+    #endif
     if (estimatedUsage <= lowerThreshold)
     {
-#ifdef DEBUG_MODE
+    #ifdef DEBUG_MODE
         std::print("Thread 2 : Output Delay Called\n");
-#endif
+    #endif
 
         std::this_thread::sleep_for(std::chrono::milliseconds(outputDelay));
     }
