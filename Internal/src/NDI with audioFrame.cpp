@@ -22,7 +22,7 @@ static void sigIntHandler(int) {exit_loop = true;}
 constexpr auto SAMPLE_RATE					= 44100;
 constexpr auto PA_BUFFER_SIZE				= 128;
 constexpr auto NDI_TIMEOUT					= 1000;
-constexpr auto QUEUE_SIZE_MULTIPLIER		= 1.75;
+constexpr auto QUEUE_SIZE_MULTIPLIER		= 5;
 audioQueue<float> NDIdata(0);
 audioQueue<float> MicroInput(0);
 #pragma endregion
@@ -38,6 +38,7 @@ inline T*	NDIErrorCheck (T*	   ptr){if (!ptr){ std::print("NDI Error: No source 
 inline void  PAErrorCheck (PaError err){if ( err){ std::print("PortAudio error : {}.\n", Pa_GetErrorText(err)); exit(EXIT_FAILURE);}}
 #pragma endregion
 
+#pragma region NDI IO
 void NDIAudioTread()
 {
 	std::signal(SIGINT, sigIntHandler);
@@ -106,7 +107,13 @@ static int portAudioOutputCallback(const void*					   inputBuffer,
 										 void*					   UserData)
 {
 	auto out = static_cast<float*>(outputBuffer);
-	NDIdata.pop(out, framesPerBuffer);
+	memset(out, 0, framesPerBuffer * 2);
+	//auto in = static_cast<const float*>(inputBuffer);
+	//MicroInput.setCapacity(8192);
+	//icroInput.setChannelNum(2);
+	//MicroInput.push(in, framesPerBuffer);
+	NDIdata.pop(out, framesPerBuffer, false);
+	//MicroInput.pop(out, framesPerBuffer,true);
 	return paContinue;
 }
 
@@ -145,6 +152,7 @@ void portAudioOutputThread()
 	
 #pragma endregion
 }
+#pragma endregion
 
 int main()
 {
@@ -159,3 +167,35 @@ int main()
 	PAErrorCheck(Pa_Terminate());
 	return 0;
 }
+/*
+#pragma region Microphone In
+static int portAudioInputCallback(const void* inputBuffer,
+	void* outputBuffer,
+	unsigned long				framesPerBuffer,
+	const PaStreamCallbackTimeInfo* timeInfo,
+	PaStreamCallbackFlags		statusFlags,
+	void* UserData)
+{
+	auto in = static_cast<const float*>(inputBuffer);
+	MicroInput.setCapacity(8192);
+	MicroInput.setChannelNum(2);
+	MicroInput.push(in, framesPerBuffer);
+	return paContinue;
+}
+void portAudioInputThread()
+{
+	PaStream* streamIn;
+	PAErrorCheck(Pa_OpenDefaultStream(&streamIn,						// PaStream ptr
+		2,								// Input  channels
+		0,								// Output channels
+		paFloat32,						// Sample format
+		44100,					// 44100
+		28,					// 128
+		portAudioInputCallback,			// Callback function called
+		nullptr));						// No user NDIdata passed
+	PAErrorCheck(Pa_StartStream(streamIn));
+	while (!exit_loop) {}
+	PAErrorCheck(Pa_StopStream(streamIn));
+	PAErrorCheck(Pa_CloseStream(streamIn));
+}
+#pragma endregion*/

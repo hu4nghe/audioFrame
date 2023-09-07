@@ -1,6 +1,71 @@
 ﻿#include "audioFrame.h"
 #include "portaudio.h"
 
+int main()
+{
+	audioQueue<float> a(10);
+	float* in = new float[10];
+
+
+	for (int i = 0; i < 10; i++)
+	{
+		in[i] = 10.5 - i;
+	}
+
+	a.push(in, 10);
+	delete[] in;
+
+	auto out = std::make_unique<float>(11);
+	float *b = out.get();
+	a.pop(b, 10, false);
+	for (int i = 0; i < 10; i++)
+		std::print("mode + :{}\n", b[i]);
+
+	return 0;
+}
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+/* 
+
 static std::atomic<bool> exit_loop(false);
 static void sigIntHandler(int) { exit_loop = true; }
 
@@ -17,13 +82,8 @@ static int portAudioInputCallback(const void*						inputBuffer,
 {
 	auto in = static_cast<const float*>(inputBuffer);
 	MicroInput.setCapacity(8192);
-	float* temp = new float[framesPerBuffer * 2];
-	for (int i = 0; i < framesPerBuffer * 2; i++)
-	{
-		temp[i] = in[i];
-	}
 	MicroInput.setChannelNum(2);
-	MicroInput.push(temp, framesPerBuffer);
+	MicroInput.push(in, framesPerBuffer);
 	return paContinue;
 }
 
@@ -35,7 +95,7 @@ static int portAudioOutputCallback(const void* inputBuffer,
 	void* UserData)
 {
 	auto out = static_cast<float*>(outputBuffer);
-	MicroInput.pop(out, framesPerBuffer);
+	MicroInput.pop(out, framesPerBuffer,true);
 	std::print("out : poped\n");
 	return paContinue;
 }
@@ -88,4 +148,4 @@ int main()
 	portaudioIn.join();
 	portaudioOUt.join();
 	PAErrorCheck(Pa_Terminate());
-}
+}*/

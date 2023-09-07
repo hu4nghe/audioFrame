@@ -1,13 +1,14 @@
 #ifndef audioQueue_H
 #define audioQueue_H
 
-#define DEBUG_MODE
 #include <algorithm>
 #include <atomic>
 #include <print>
 #include <thread>
 #include <type_traits>
 #include <vector>
+
+#include "samplerate.h"
 
 template <typename T, typename = std::enable_if_t<std::is_same_v<T, float> || std::is_same_v<T, short>>>
 class audioQueue 
@@ -35,7 +36,9 @@ class audioQueue
                        void  push            (const           T*  ptr, 
                                               const std:: size_t  frames);
                        void  pop             (                T* &ptr, 
-                                              const std:: size_t  frames);                
+                                              const std:: size_t  frames,
+                                              const         bool  mode,
+                                              const std:: size_t  outputSampleRate);                
 
     inline             void  setSampleRate   (const std:: size_t  sRate)               { audioSampleRate = sRate; }
     inline             void  setChannelNum   (const std:: size_t  cNum )               { channelNum = cNum; }
@@ -52,7 +55,8 @@ class audioQueue
                
     private : //Private member functions
                        bool  enqueue         (const            T  value);
-                       bool  dequeue         (                 T &value);
+                       bool  dequeue         (                 T &value,
+                                              const         bool  mode);
                        void  clear           ();
                        void  usageRefresh    (); 
 };
@@ -60,7 +64,7 @@ class audioQueue
 #pragma region Constructors
 template<typename T, typename U>
 inline audioQueue<T, U>::audioQueue(const std::size_t initialCapacity)
-    :   queue(initialCapacity), head(0), tail(0),usage(0), audioSampleRate(0), channelNum(0), 
+    :   queue(initialCapacity+1), head(0), tail(0),usage(0), audioSampleRate(44100), channelNum(1), 
     elementCount(0), lowerThreshold(20), upperThreshold(80), inputDelay(45), outputDelay(15) {}
 #pragma endregion
 
@@ -81,13 +85,14 @@ bool audioQueue<T,U>::enqueue(const T value)
 }
 
 template<typename T, typename U >
-bool audioQueue<T,U>::dequeue(T& value)
+bool audioQueue<T,U>::dequeue(T& value, const bool mode)
 {
     std::size_t currentHead = head.load(std::memory_order_relaxed);
 
     if (currentHead == tail.load(std::memory_order_acquire)) return false; // Queue is empty
 
-    value = queue[currentHead];
+    if (!mode) value = queue[currentHead];
+    else value += queue[currentHead];
     head.store((currentHead + 1) % queue.size(), std::memory_order_release);
     elementCount.fetch_sub(1, std::memory_order_relaxed);
 
@@ -106,6 +111,7 @@ template<typename T, typename U>
 inline void audioQueue<T,U>::usageRefresh()
 {
     usage.store(static_cast<std::uint8_t>(static_cast<double>(elementCount.load()) / queue.size() * 100.0));
+    std::print("usage:{}\n", usage.load());
 }
 #pragma endregion
 
@@ -131,22 +137,89 @@ void audioQueue<T,U>::push(const T* ptr, std::size_t frames)
 }
 
 template<typename T, typename U>
-void audioQueue<T,U>::pop(T*& ptr, std::size_t frames)
+void audioQueue<T,U>::pop(T*& ptr, std::size_t frames,const bool mode, const std::size_t outputSampleRate)
 {   
     const auto size = frames * channelNum;
     const auto estimatedUsage = usage.load() >= (size * 100 / queue.size()) ? usage.load() - (size * 100 / queue.size()) : 0;
     
     if (estimatedUsage <= lowerThreshold) std::this_thread::sleep_for(std::chrono::milliseconds(outputDelay));
 
-    for (auto i = 0; i < size; i++)
+    if (audioSampleRate != outputSampleRate)
     {
-        if (!this->dequeue(ptr[i])) 
+        for (auto i = 0; i < size; i++)
         {
-            std::print("Warning : there is only {} elements were poped, {} demanded.\n", i, size);
-            break;
+            if (!this->dequeue(ptr[i],mode)) 
+            {
+                std::print("Warning : there is only {} elements were poped, {} demanded.\n", i, size);
+                break;
+            }
         }
+        usageRefresh();
     }
-    usageRefresh();
+    else
+    {
+        auto temp = std::make_unique<T>(size);
+        for (auto i = 0; i < size; i++)
+        {
+            if (!this->dequeue(temp[i], mode))
+            {
+                std::print("Warning : there is only {} elements were poped, {} demanded.\n", i, size);
+                break;
+            }
+        }
+
+
+        SRC_STATE* srcState = src_new(SRC_SINC_BEST_QUALITY, channelNum, nullptr);
+
+        const auto resempleRatio = static_cast<double>(outputSampleRate) / static_cast<double>(this->sampleRate);
+        const auto newSize = static_cast<int>(queue.size() * resempleRatio) + 1;
+
+        auto out = std::make_unique<T>(newSize);
+
+        SRC_DATA srcData;
+        srcData.data_in = temp.get();
+        srcData.data_out = out.get();
+        srcData.src_ratio = resempleRatio;
+
+        std::cout << src_strerror(src_process(srcState, &srcData)) << std::endl;
+        std::vector<float> temp(out, out + queue.size());
+        queue = temp;
+
+        for (auto& i : queue)
+            std::cout << i << std::endl;
+
+        src_delete(srcState);
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+    }
+    
+
+    
+
 }
 
 template<typename T, typename U>
