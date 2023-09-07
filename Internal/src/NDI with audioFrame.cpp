@@ -85,7 +85,7 @@ void NDIAudioTread()
 			if(audioDataNDI.sample_rate != NDIdata.sampleRate()) NDIdata.setSampleRate(audioDataNDI.sample_rate);
 			NDIdata.setCapacity (static_cast<std::size_t>(dataSize * QUEUE_SIZE_MULTIPLIER));
 
-			NDIdata.push(audioDataNDI.p_data, audioDataNDI.no_samples);
+			NDIdata.push(audioDataNDI.p_data, audioDataNDI.no_samples,44100);
 
 			delete[] audioDataNDI.p_data;
 		}
