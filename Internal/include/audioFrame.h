@@ -9,11 +9,10 @@
 #include <type_traits>
 #include <vector>
 
-template <typename T,
-          typename = std::enable_if_t<std::is_same_v<T, float> || std::is_same_v<T, short>>>
+template <typename T, typename = std::enable_if_t<std::is_same_v<T, float> || std::is_same_v<T, short>>>
 class audioQueue 
 {
-    private:
+    private : //Class members
               std::vector<T> queue;
 
                 std::size_t  audioSampleRate;
@@ -29,41 +28,40 @@ class audioQueue
 //             std::uint8_t  volume; 
    std::atomic<std::uint8_t> usage;
 
-
-                       bool  enqueue         (const       T  value);
-                       bool  dequeue         (            T &value);
-                       void  clear           ();
-                       void  usageRefresh    ();            
-    public:
+    public : //Public member functions
                              audioQueue      () = default;
-                             audioQueue      (const  std::size_t  initialCapacity);
+                             audioQueue      (const std:: size_t  initialCapacity);
 
                        void  push            (const           T*  ptr, 
-                                              const  std::size_t  frames);
+                                              const std:: size_t  frames);
                        void  pop             (                T* &ptr, 
-                                              const  std::size_t  frames);                
+                                              const std:: size_t  frames);                
 
-    inline             void  setSampleRate   (const  std::size_t  sRate){ audioSampleRate = sRate; }
-    inline             void  setChannelNum   (const  std::size_t  cNum ){ channelNum = cNum; }
-
-                       void  setCapacity     (const  std::size_t  newCapacity);
+    inline             void  setSampleRate   (const std:: size_t  sRate)               { audioSampleRate = sRate; }
+    inline             void  setChannelNum   (const std:: size_t  cNum )               { channelNum = cNum; }
+                       void  setCapacity     (const std:: size_t  newCapacity);
 //                     void  setVolume       (const std::uint8_t  volume);                     
                        void  setDelay        (const std::uint8_t  lower, 
                                               const std::uint8_t  upper, 
-                                              const  std::size_t  iDelay, 
-                                              const  std::size_t  oDelay);
+                                              const std:: size_t  iDelay, 
+                                              const std:: size_t  oDelay);
                
-    inline       std::size_t  channels        () const { return channelNum; }
-    inline       std::size_t  sampleRate      () const { return audioSampleRate; }
-    inline       std::size_t  size            () const { return elementCount.load(); }
+    inline      std::size_t  channels        () const { return channelNum; }
+    inline      std::size_t  sampleRate      () const { return audioSampleRate; }
+    inline      std::size_t  size            () const { return elementCount.load(); }
+               
+    private : //Private member functions
+                       bool  enqueue         (const            T  value);
+                       bool  dequeue         (                 T &value);
+                       void  clear           ();
+                       void  usageRefresh    (); 
 };
 
 #pragma region Constructors
 template<typename T, typename U>
 inline audioQueue<T, U>::audioQueue(const std::size_t initialCapacity)
-    : queue(initialCapacity), head(0), tail(0),usage(0), audioSampleRate(0),
-      channelNum(0),  elementCount(0), lowerThreshold(20), upperThreshold(80), 
-      inputDelay(45), outputDelay(15) {}
+    :   queue(initialCapacity), head(0), tail(0),usage(0), audioSampleRate(0), channelNum(0), 
+    elementCount(0), lowerThreshold(20), upperThreshold(80), inputDelay(45), outputDelay(15) {}
 #pragma endregion
 
 #pragma region Private member functions

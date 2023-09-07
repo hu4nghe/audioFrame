@@ -1,19 +1,91 @@
 ﻿#include "audioFrame.h"
+#include "portaudio.h"
+
+static std::atomic<bool> exit_loop(false);
+static void sigIntHandler(int) { exit_loop = true; }
+
+inline void  PAErrorCheck(PaError err) { if (err) { std::print("PortAudio error : {}.\n", Pa_GetErrorText(err)); exit(EXIT_FAILURE); } }
+audioQueue<float> MicroInput(0);
+constexpr auto QUEUE_SIZE_MULTIPLIER = 1.8;
+
+static int portAudioInputCallback(const void*						inputBuffer,
+										void*						outputBuffer,
+										unsigned long				framesPerBuffer,
+								  const PaStreamCallbackTimeInfo*	timeInfo,
+										PaStreamCallbackFlags		statusFlags,
+										void* UserData)
+{
+	auto in = static_cast<const float*>(inputBuffer);
+	auto out = static_cast<float*>(outputBuffer);
+
+	std::vector<float> temp(framesPerBuffer);
+	for (auto i = 0; i < framesPerBuffer * 2; i++)
+	{
+		out[i] = in[i];
+	}
+	//MicroInput.setCapacity(static_cast<size_t>(framesPerBuffer * 2 * QUEUE_SIZE_MULTIPLIER));
+	//std::print("in : capacity set\n");
+	//MicroInput.push(temp.data(), framesPerBuffer);
+	return paContinue;
+}
+
+static int portAudioOutputCallback(const void* inputBuffer,
+	void* outputBuffer,
+	unsigned long				framesPerBuffer,
+	const PaStreamCallbackTimeInfo* timeInfo,
+	PaStreamCallbackFlags		statusFlags,
+	void* UserData)
+{
+	auto out = static_cast<float*>(outputBuffer);
+	MicroInput.pop(out, framesPerBuffer);
+	std::print("out : poped\n");
+	return paContinue;
+}
+
+
+void portAudioInputThread()
+{
+	
+	PaStream* streamIn;
+	PAErrorCheck(Pa_OpenDefaultStream(&streamIn,						// PaStream ptr
+		2,								// Input  channels
+		0,								// Output channels
+		paFloat32,						// Sample format
+		44100,					// 44100
+		128,					// 128
+		portAudioInputCallback,			// Callback function called
+		nullptr));						// No user NDIdata passed
+	PAErrorCheck(Pa_StartStream(streamIn));
+	while (!exit_loop) {}
+	PAErrorCheck(Pa_StopStream(streamIn));
+	PAErrorCheck(Pa_CloseStream(streamIn));
+}
+
+
+void paOut()
+{
+	PaStream* streamIn;
+	PAErrorCheck(Pa_OpenDefaultStream(&streamIn,						// PaStream ptr
+		0,								// Input  channels
+		2,								// Output channels
+		paFloat32,						// Sample format
+		44100,					// 44100
+		128,					// 128
+		portAudioOutputCallback,			// Callback function called
+		nullptr));						// No user NDIdata passed
+	PAErrorCheck(Pa_StartStream(streamIn));
+	while (!exit_loop) {}
+	PAErrorCheck(Pa_StopStream(streamIn));
+	PAErrorCheck(Pa_CloseStream(streamIn));
+	
+}
 
 int main()
 {
-    audioQueue<float> data(10);
-    data.setChannelNum(2);
-    data.setSampleRate(44100);
-
-    float a[5] = { 1.2, 3.6, 4.8, 9.5, 56.871 };
-    data.push(a, 5);
-
-    float* out = new float[5];
-    data.pop(out, 11);
-
-    for (int i = 0; i < 5; i++)
-        std::cout << out[i] << std::endl;
-    return 0;
-
+	Pa_Initialize();
+	std::thread portaudioIn(portAudioInputThread);
+	//std::thread portaudioOUt(paOut);
+	portaudioIn.join();
+	//portaudioOUt.join();
+	PAErrorCheck(Pa_Terminate());
 }

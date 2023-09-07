@@ -24,6 +24,7 @@ constexpr auto PA_BUFFER_SIZE				= 128;
 constexpr auto NDI_TIMEOUT					= 1000;
 constexpr auto QUEUE_SIZE_MULTIPLIER		= 1.75;
 audioQueue<float> NDIdata(0);
+audioQueue<float> MicroInput(0);
 #pragma endregion
 
 /**
@@ -42,7 +43,6 @@ void NDIAudioTread()
 	std::signal(SIGINT, sigIntHandler);
 
 	#pragma region NDI Initialization
-	NDIlib_initialize();
 	// Create a NDI finder and try to find a source NDI 
 	const NDIlib_find_create_t NDIFindCreateDesc;
 	auto pNDIFind = NDIErrorCheck(NDIlib_find_create_v2(&NDIFindCreateDesc));
@@ -105,16 +105,8 @@ static int portAudioOutputCallback(const void*					   inputBuffer,
 										 PaStreamCallbackFlags	   statusFlags,
 										 void*					   UserData)
 {
-	
 	auto out = static_cast<float*>(outputBuffer);
 	NDIdata.pop(out, framesPerBuffer);
-	
-	auto in = static_cast<const float*>(inputBuffer);
-	for (auto i = 0; i < framesPerBuffer * 2; i++)
-	{
-		out[i] += in[i] * 3;
-	}
-	
 	return paContinue;
 }
 
@@ -125,16 +117,14 @@ void portAudioOutputThread()
 #pragma region PA Initialization
 
 	PaStream* streamOut;
-	PAErrorCheck(Pa_Initialize			());
 	PAErrorCheck(Pa_OpenDefaultStream	(&streamOut,					// PaStream ptr
-										 2,								// Input  channels
+										 0,								// Input  channels
 										 2,								// Output channels
 										 paFloat32,						// Sample format
 									     SAMPLE_RATE,					// 44100
 										 PA_BUFFER_SIZE,				// 128
 										 portAudioOutputCallback,		// Callback function called
 										 nullptr));						// No user NDIdata passed
-
 	PAErrorCheck(Pa_StartStream			(streamOut));
 #pragma endregion
 
@@ -152,17 +142,20 @@ void portAudioOutputThread()
 
 	PAErrorCheck(Pa_StopStream	(streamOut));
 	PAErrorCheck(Pa_CloseStream	(streamOut));
-	PAErrorCheck(Pa_Terminate	());
+	
 #pragma endregion
 }
 
 int main()
 {
+	NDIlib_initialize();
+	PAErrorCheck(Pa_Initialize());
 	std::thread ndiThread(NDIAudioTread);
 	std::thread portaudio(portAudioOutputThread);
 
+
 	ndiThread.detach();
 	portaudio.join();
-	                 
+	PAErrorCheck(Pa_Terminate());
 	return 0;
 }
