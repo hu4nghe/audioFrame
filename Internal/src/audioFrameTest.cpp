@@ -16,16 +16,14 @@ static int portAudioInputCallback(const void*						inputBuffer,
 										void* UserData)
 {
 	auto in = static_cast<const float*>(inputBuffer);
-	auto out = static_cast<float*>(outputBuffer);
-
-	std::vector<float> temp(framesPerBuffer);
-	for (auto i = 0; i < framesPerBuffer * 2; i++)
+	MicroInput.setCapacity(8192);
+	float* temp = new float[framesPerBuffer * 2];
+	for (int i = 0; i < framesPerBuffer * 2; i++)
 	{
-		out[i] = in[i];
+		temp[i] = in[i];
 	}
-	//MicroInput.setCapacity(static_cast<size_t>(framesPerBuffer * 2 * QUEUE_SIZE_MULTIPLIER));
-	//std::print("in : capacity set\n");
-	//MicroInput.push(temp.data(), framesPerBuffer);
+	MicroInput.setChannelNum(2);
+	MicroInput.push(temp, framesPerBuffer);
 	return paContinue;
 }
 
@@ -45,16 +43,15 @@ static int portAudioOutputCallback(const void* inputBuffer,
 
 void portAudioInputThread()
 {
-	
 	PaStream* streamIn;
-	PAErrorCheck(Pa_OpenDefaultStream(&streamIn,						// PaStream ptr
-		2,								// Input  channels
-		0,								// Output channels
-		paFloat32,						// Sample format
-		44100,					// 44100
-		128,					// 128
-		portAudioInputCallback,			// Callback function called
-		nullptr));						// No user NDIdata passed
+	PAErrorCheck(Pa_OpenDefaultStream( &streamIn,						// PaStream ptr
+										2,								// Input  channels
+										0,								// Output channels
+										paFloat32,						// Sample format
+										44100,					// 44100
+										28,					// 128
+										portAudioInputCallback,			// Callback function called
+										nullptr));						// No user NDIdata passed
 	PAErrorCheck(Pa_StartStream(streamIn));
 	while (!exit_loop) {}
 	PAErrorCheck(Pa_StopStream(streamIn));
@@ -66,26 +63,29 @@ void paOut()
 {
 	PaStream* streamIn;
 	PAErrorCheck(Pa_OpenDefaultStream(&streamIn,						// PaStream ptr
-		0,								// Input  channels
-		2,								// Output channels
-		paFloat32,						// Sample format
-		44100,					// 44100
-		128,					// 128
-		portAudioOutputCallback,			// Callback function called
-		nullptr));						// No user NDIdata passed
+										0,								// Input  channels
+										2,								// Output channels
+										paFloat32,						// Sample format
+										44100,					// 44100
+										128,					// 128
+										portAudioOutputCallback,			// Callback function called
+										nullptr));						// No user NDIdata passed
 	PAErrorCheck(Pa_StartStream(streamIn));
-	while (!exit_loop) {}
+	while (!exit_loop) 
+	{
+		if (!MicroInput.size()) Pa_AbortStream(streamIn);
+		if (MicroInput.size() && Pa_IsStreamStopped(streamIn)) Pa_StartStream(streamIn);
+	}
 	PAErrorCheck(Pa_StopStream(streamIn));
 	PAErrorCheck(Pa_CloseStream(streamIn));
-	
 }
 
 int main()
 {
 	Pa_Initialize();
 	std::thread portaudioIn(portAudioInputThread);
-	//std::thread portaudioOUt(paOut);
+	std::thread portaudioOUt(paOut);
 	portaudioIn.join();
-	//portaudioOUt.join();
+	portaudioOUt.join();
 	PAErrorCheck(Pa_Terminate());
 }
