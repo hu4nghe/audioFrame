@@ -30,35 +30,41 @@ class audioQueue
    std::atomic<std::uint8_t> usage;
 
     public : //Public member functions
-                             audioQueue      () = default;
-                             audioQueue      (const std:: size_t  initialCapacity);
+                             audioQueue         () = default;
+                             audioQueue         (const std:: size_t  initialCapacity);
 
-                       void  push            (const           T*  ptr, 
-                                              const std:: size_t  frames,
-                                              const std::size_t  outputSampleRate);
-                       void  pop             (                T* &ptr, 
-                                              const std:: size_t  frames,
-                                              const         bool  mode);                
+                       void  push               (const           T*  ptr, 
+                                                 const std:: size_t  frames,
+                                                 const std:: size_t  outputChannelNum,
+                                                 const std:: size_t  outputSampleRate);
+                       void  pop                (                T* &ptr, 
+                                                 const std:: size_t  frames,
+                                                 const         bool  mode);                
 
-    inline             void  setSampleRate   (const std:: size_t  sRate)               { audioSampleRate = sRate; }
-    inline             void  setChannelNum   (const std:: size_t  cNum )               { channelNum = cNum; }
-                       void  setCapacity     (const std:: size_t  newCapacity);
-//                     void  setVolume       (const std::uint8_t  volume);                     
-                       void  setDelay        (const std::uint8_t  lower, 
-                                              const std::uint8_t  upper, 
-                                              const std:: size_t  iDelay, 
-                                              const std:: size_t  oDelay);
+    inline             void  setSampleRate      (const std:: size_t  sRate)               { audioSampleRate = sRate; }
+    inline             void  setChannelNum      (const std:: size_t  cNum )               { channelNum = cNum; }
+                       void  setCapacity        (const std:: size_t  newCapacity);
+//                     void  setVolume          (const std::uint8_t  volume);                     
+                       void  setDelay           (const std::uint8_t  lower, 
+                                                 const std::uint8_t  upper, 
+                                                 const std:: size_t  iDelay, 
+                                                 const std:: size_t  oDelay);
                
-    inline      std::size_t  channels        () const { return channelNum; }
-    inline      std::size_t  sampleRate      () const { return audioSampleRate; }
-    inline      std::size_t  size            () const { return elementCount.load(); }
+    inline      std::size_t  channels           () const { return channelNum; }
+    inline      std::size_t  sampleRate         () const { return audioSampleRate; }
+    inline      std::size_t  size               () const { return elementCount.load(); }
                
     private : //Private member functions
-                       bool  enqueue         (const            T  value);
-                       bool  dequeue         (                 T &value,
-                                              const         bool  mode);
-                       void  clear           ();
-                       void  usageRefresh    (); 
+                       bool  enqueue            (const            T  value);
+                       bool  dequeue            (                 T &value,
+                                                 const         bool  mode);
+                       void  clear              ();
+                       void  usageRefresh       (); 
+                       void  resample           (const std:: size_t  begin,
+                                                 const std:: size_t  end);
+                       void  channelConversion  (const           T*  ptr, 
+                                                 const std:: size_t  frames,
+                                                 const std:: size_t  targetChannelNum);
 };
 
 #pragma region Constructors
@@ -111,27 +117,84 @@ template<typename T, typename U>
 inline void audioQueue<T,U>::usageRefresh()
 {
     usage.store(static_cast<std::uint8_t>(static_cast<double>(elementCount.load()) / queue.size() * 100.0));
-    std::print("usage:{}\n", usage.load());
 }
+
+template<typename T, typename U>
+inline void audioQueue<T, U>::channelConversion(const T* ptr, const std::size_t frames, const std::size_t targetChannelNum)
+{
+    const auto size = frames * targetChannelNum;
+    std::vector<T> temp(size);
+    if (channelNum > outputChannelNum)
+    {
+        for (auto i = 0; i < size; i += targetChannelNum)
+        {
+            for (auto j = i; j < i + channelNum; j++)
+            {
+                temp.push_back(ptr[i]);
+            }
+            for (auto j = i + channelNum, j < i + targetChannelNum; j++)
+            {
+                temp.push_back(static_cast<T>(0));
+            }
+        }
+    }
+    //channel conversion
+    channelNum = outputChannelNum;
+}
+
 #pragma endregion
 
 #pragma region Public APIs
 template<typename T, typename U>
-void audioQueue<T,U>::push(const T* ptr, std::size_t frames, const std::size_t  outputSampleRate)
+void audioQueue<T,U>::push(const T* ptr, std::size_t frames, const std::size_t outputChannelNum, const std::size_t outputSampleRate)
 {
-    const auto size = frames * channelNum;
+    const bool channelConversion = (outputChannelNum != channelNum);
+    const bool resample          = (outputSampleRate != audioSampleRate);
+
+    std::vector<T> temp0, temp1;
+
+    
+    if (resample)
+    {
+        SRC_STATE* srcState = src_new(SRC_SINC_BEST_QUALITY, channelNum, nullptr);
+
+        out = new T[newSize];
+
+        const auto resempleRatio = static_cast<double>(outputSampleRate) / static_cast<double>(audioSampleRate);
+        const auto newSize = static_cast<size_t>(std::ceil(static_cast<double>(frames) * static_cast<double>(outputChannelNum) * resampleRatio));
+
+        std::vector<T> temp0(newSize);
+
+        if (channelConversion && resample) std::vector<T> temp1(frames * outputChannelNum);
+        SRC_DATA srcData;
+        srcData.data_in         = temp.data();
+        srcData.data_out        = out;
+        srcData.input_frames    = temp.size();
+        srcData.output_frames   = newSize;
+        srcData.src_ratio       = resempleRatio;
+
+        const char* errorInfo = src_strerror(src_process(srcState, &srcData));
+
+        src_delete(srcState);
+
+        sampleRate = outputSampleRate;
+
+        return true;
+
+    }
+
+    const auto size = frames/*freames after operation*/ * channelNum/*channels after operation*/;
     const auto estimatedUsage = usage.load() + (size * 100 / queue.size());
 
     if (estimatedUsage >= upperThreshold) std::this_thread::sleep_for(std::chrono::milliseconds(inputDelay));
 
-    for (auto i = 0; i < size; i++)
+    for (auto i = 0; i < size/*size after oerpation*/; i++)
     {
-        if (!(this->enqueue(ptr[i])))
+        if (!(this->enqueue(out[i])))
         {
             std::print("Warning : push operation aborted, not enough space. {} elements are pushed.\n",i);
             break;
         }
-        
     }
     usageRefresh();
 }

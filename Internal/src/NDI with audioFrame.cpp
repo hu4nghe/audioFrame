@@ -22,7 +22,7 @@ static void sigIntHandler(int) {exit_loop = true;}
 constexpr auto SAMPLE_RATE					= 44100;
 constexpr auto PA_BUFFER_SIZE				= 128;
 constexpr auto NDI_TIMEOUT					= 1000;
-constexpr auto QUEUE_SIZE_MULTIPLIER		= 5;
+constexpr auto QUEUE_SIZE_MULTIPLIER		= 1.5;
 audioQueue<float> NDIdata(0);
 audioQueue<float> MicroInput(0);
 #pragma endregion
