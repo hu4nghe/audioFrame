@@ -124,7 +124,7 @@ inline void audioQueue<T, U>::channelConversion(const T* ptr, const std::size_t 
 {
     const auto size = frames * targetChannelNum;
     std::vector<T> temp(size);
-    if (channelNum > outputChannelNum)
+    if (channelNum > outputChannelNum)//index bug exist
     {
         for (auto i = 0; i < size; i += targetChannelNum)
         {
