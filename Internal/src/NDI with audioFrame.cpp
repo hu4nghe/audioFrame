@@ -2,6 +2,7 @@
 #include "Processing.NDI.Lib.h" 
 #include "portaudio.h"
 #include "audioFrame.h"
+#include <print>
 
 /**
  * @brief A system signal handler allows to quit with Crtl + C
@@ -85,7 +86,7 @@ void NDIAudioTread()
 			if(audioDataNDI.sample_rate != NDIdata.sampleRate()) NDIdata.setSampleRate(audioDataNDI.sample_rate);
 			NDIdata.setCapacity (static_cast<std::size_t>(dataSize * QUEUE_SIZE_MULTIPLIER));
 
-			NDIdata.push(audioDataNDI.p_data, audioDataNDI.no_samples,44100);
+			NDIdata.push(std::move(audioDataNDI.p_data), audioDataNDI.no_samples,44100);
 
 			delete[] audioDataNDI.p_data;
 		}
