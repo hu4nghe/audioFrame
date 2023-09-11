@@ -7,6 +7,7 @@
 #include <thread>
 #include <type_traits>
 #include <vector>
+#include <list>
 
 #include "samplerate.h"
 
@@ -121,26 +122,19 @@ inline void audioQueue<T,U>::usageRefresh()
 template<typename T, typename U>
 std::vector<T> audioQueue<T, U>::channelConversion(std::vector<T>& data, const std::size_t targetChannelNum)
 {
-    const auto size = frames * targetChannelNum;
+    const auto newSize = data.size() / channelNum * targetChannelNum;
+    data.reserve(newSize);
 
-    std::vector<T> temp(size);
-
-    if (channelNum > outputChannelNum)//index bug exist
+    //channel conversion
+    for (auto i = 0; i < newSize; i += channelNum)
     {
-        for (auto i = 0; i < size; i += targetChannelNum)
+        for (auto j = 0; j < (targetChannelNum - channelNum); j++)
         {
-            for (auto j = i; j < i + channelNum; j++)
-            {
-                temp.push_back(ptr[i]);
-            }
-            for (auto j = i + channelNum, j < i + targetChannelNum; j++)
-            {
-                temp.push_back(static_cast<T>(0));
-            }
+
         }
     }
-    //channel conversion
-    channelNum = outputChannelNum;
+
+    channelNum = targetChannelNum;
 }
 
 #pragma endregion
@@ -149,12 +143,12 @@ std::vector<T> audioQueue<T, U>::channelConversion(std::vector<T>& data, const s
 template<typename T, typename U>
 void audioQueue<T,U>::push(T*&& ptr, std::size_t frames, const std::size_t outputChannelNum, const std::size_t outputSampleRate)
 {   
-    const auto currentSize           = frames * channelNum;
+    
+
     const bool needChannelConversion = (outputChannelNum != channelNum);
     const bool needResample          = (outputSampleRate != audioSampleRate);
-    \
-    std::vector<T> temp;
-    temp.reserve(currentSize);
+    const auto currentSize           = frames * channelNum;
+    std::list<T> temp;
     std::move(ptr, ptr + currentSize, std::back_inserter(temp));
 
     if (needChannelConversion)
@@ -166,17 +160,16 @@ void audioQueue<T,U>::push(T*&& ptr, std::size_t frames, const std::size_t outpu
         //const auto sampleRateRatio = static_cast<double>(outputSampleRate) / static_cast<double>(audioSampleRate);
         resample(temp,outputSampleRate);
     }
-
-    const auto sizeAfterTrai = temp1.size();
-    const auto estimatedUsage = usage.load() + (size * 100 / queue.size());
+    const auto finalSize = temp.size();
+    const auto estimatedUsage = usage.load() + (finalSize * 100 / queue.size());
 
     if (estimatedUsage >= upperThreshold) std::this_thread::sleep_for(std::chrono::milliseconds(inputDelay));
 
-    for (auto i = 0; i < size/*size after oerpation*/; i++)
+    for (auto i = 0; i < finalSize; i++)
     {
         if (!(this->enqueue(out[i])))
         {
-            std::print("Warning : push operation aborted, not enough space. {} elements are pushed.\n",i);
+            std::print("Warning : push operation aborted, not enough space. {} elements are pushed.\n",i+1);
             break;
         }
     }

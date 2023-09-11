@@ -1,31 +1,52 @@
-﻿#include "audioFrame.h"
-#include "portaudio.h"
+﻿#include <iostream>
+#include <list>
+#include <print>
 
-int main()
-{
-	audioQueue<float> a(10);
-	float* in = new float[10];
+int main() {
+	std::list<int> a = { 1, 2, 3, 4, 5, 6, 7, 8, 9 ,10,11,12,13,14,15,16,17,18,19,20,21,22,23,24,25,26,27,28,29,30,31,32,33,34,35,36 };
+	int x = 6; 
+	int y = 2; 
 
+	int copyCount			= std::min(x, y);
+	int modificationCount	= std::abs(x - y);
+	
 
-	for (int i = 0; i < 10; i++)
+	if (x < y)
 	{
-		in[i] = 10.5 - i;
+		for (auto iter = std::next(a.begin(), copyCount);iter != a.end();std::advance(iter, copyCount+ modificationCount))
+		{
+			a.insert(iter, modificationCount, 0);
+		}
+		a.insert(a.end(), modificationCount, 0);
 	}
+	else //Convert audio from mono/stereo to a multi-channel.
+	{
+		auto naut = a.end();
+		for (auto iter = std::next(a.begin(), copyCount); iter != a.end(); std::advance(iter, copyCount))
+		{
+			std::print("current iter pos : {}\n", *iter);
+			for (auto i = 0; i < modificationCount; i++)
+			{
+				if (std::next(iter, 1) != a.end())
+					iter = a.erase(iter);
+				else
+				{
+					a.erase(iter);
+					goto x;
+				}
 
-	a.push(in, 10);
-	delete[] in;
-
-	auto out = std::make_unique<float>(11);
-	float *b = out.get();
-	a.pop(b, 10, false);
-	for (int i = 0; i < 10; i++)
-		std::print("mode + :{}\n", b[i]);
+			}		
+		}
+	}
+	x:
+	for (const auto& element : a) 
+	{
+		std::cout << element << " ";
+	}
+	std::cout << std::endl;
 
 	return 0;
 }
-
-
-
 
 
 
