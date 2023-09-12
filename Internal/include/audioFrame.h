@@ -8,7 +8,6 @@
 #include <thread>
 #include <type_traits>
 #include <vector>
-#include <list>
 
 #include "samplerate.h"
 
@@ -125,7 +124,7 @@ template<audioType T>
 void audioQueue<T>::resample(std::vector<T>& data, const std::size_t frames, const std::size_t targetSampleRate)
 {
     const auto resampleRatio = static_cast<double>(targetSampleRate) / static_cast<double>(audioSampleRate);
-    const auto newSize = static_cast<size_t>(static_cast<double>(frames) * static_cast<double>(channelNum) * resampleRatio);
+    const auto newSize       = static_cast<size_t>(static_cast<double>(frames) * static_cast<double>(channelNum) * resampleRatio);//previous frames number * channel number * ratio
     std::vector<T> temp(newSize);
 
     SRC_STATE* srcState = src_new(SRC_SINC_BEST_QUALITY, channelNum, nullptr);
@@ -138,12 +137,7 @@ void audioQueue<T>::resample(std::vector<T>& data, const std::size_t frames, con
     srcData.output_frames   = static_cast<int>(frames * resampleRatio);
     srcData.src_ratio       = resampleRatio;
 
-    auto errStr = src_strerror(src_process(srcState, &srcData));
-    std::print("{}\n", errStr);
-    if (errStr != "Input and output data arrays overlap.")
-    {
-        std::print("overlap error :\ninput frame : {}\noutput frame : {}\ninput frame used : {}\noutput frame gen : {}\n", data.size(), temp.size(), srcData.input_frames_used, srcData.output_frames_gen);
-    }
+    src_process(srcState, &srcData);
     src_delete(srcState);
 
     data = std::move(temp);
@@ -177,7 +171,7 @@ void audioQueue<T>::push(T*&& ptr, std::size_t frames, const std::size_t outputC
     /*
     const bool needChannelConversion = (outputChannelNum != channelNum);
     */
-    const bool needResample          = (outputSampleRate != audioSampleRate); 
+    const auto needResample          = (outputSampleRate != audioSampleRate); 
     const auto currentSize           = frames * channelNum;
     
     std::vector<T> temp;
