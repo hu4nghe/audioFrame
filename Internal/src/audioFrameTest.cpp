@@ -3,7 +3,8 @@
 #include <print>
 
 int main() {
-	std::list<int> a = { 1, 2, 3, 4, 5, 6, 7, 8, 9 ,10,11,12,13,14,15,16,17,18,19,20,21,22,23,24,25,26,27,28,29,30,31,32,33,34,35,36 };
+	/*conversion draft
+	std::list<int> a = {1, 2, 3, 4, 5, 6, 7, 8, 9 ,10,11,12,13,14,15,16,17,18,19,20,21,22,23,24,25,26,27,28,29,30,31,32,33,34,35,36};
 	int x = 6; 
 	int y = 2; 
 
@@ -44,7 +45,14 @@ int main() {
 		std::cout << element << " ";
 	}
 	std::cout << std::endl;
-
+*/
+	size_t outputSampleRate = 48000;
+	size_t audioSampleRate = 44100;
+	size_t frames = 8192;
+	uint8_t outputChannelNum = 2;
+	const auto resampleRatio = static_cast<double>(outputSampleRate) / static_cast<double>(audioSampleRate);
+	const auto newSize = static_cast<size_t>(std::ceil(static_cast<double>(frames) * static_cast<double>(outputChannelNum) * resampleRatio));
+	std::print("the ratio : {}, newSize : {}\n", resampleRatio, newSize);
 	return 0;
 }
 

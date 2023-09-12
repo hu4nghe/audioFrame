@@ -3,6 +3,7 @@
 
 #include <algorithm>
 #include <atomic>
+#include <concepts>
 #include <print>
 #include <thread>
 #include <type_traits>
@@ -11,7 +12,10 @@
 
 #include "samplerate.h"
 
-template <typename T, typename = std::enable_if_t<std::is_same_v<T, float> || std::is_same_v<T, short>>>
+template<typename T>
+concept audioType = std::same_as<T, short> || std::same_as<T, float>;
+
+template <audioType T>
 class audioQueue 
 {
     private : //Class members
@@ -61,22 +65,23 @@ class audioQueue
                                                  const          bool    mode);
                        void  clear              ();
                        void  usageRefresh       (); 
-              std::vector<T> resample           (      std::vector<T>   &ptr,
+                       void  resample           (      std::vector<T>  &data,
+                                                 const std::  size_t    frames,
                                                  const std::  size_t    targetSampleRate);
-              std::vector<T> channelConversion  (      std::vector<T>  &data,
+                       void channelConversion  (       std::vector<T>  &data,
                                                  const std::  size_t    targetChannelNum);
 };
 
 #pragma region Constructors
-template<typename T, typename U>
-inline audioQueue<T, U>::audioQueue(const std::size_t initialCapacity)
+template<audioType T>
+inline audioQueue<T>::audioQueue(const std::size_t initialCapacity)
     :   queue(initialCapacity+1), head(0), tail(0),usage(0), audioSampleRate(44100), channelNum(1), 
     elementCount(0), lowerThreshold(20), upperThreshold(80), inputDelay(45), outputDelay(15) {}
 #pragma endregion
 
 #pragma region Private member functions
-template<typename T, typename U>
-bool audioQueue<T,U>::enqueue(const T value)
+template<audioType T>
+bool audioQueue<T>::enqueue(const T value)
 {
     std::size_t currentTail = tail.load(std::memory_order_relaxed);
     std::size_t    nextTail = (currentTail + 1) % queue.size();
@@ -90,8 +95,8 @@ bool audioQueue<T,U>::enqueue(const T value)
     return true;
 }
 
-template<typename T, typename U >
-bool audioQueue<T,U>::dequeue(T& value, const bool mode)
+template<audioType T>
+bool audioQueue<T>::dequeue(T& value, const bool mode)
 {
     std::size_t currentHead = head.load(std::memory_order_relaxed);
 
@@ -105,22 +110,48 @@ bool audioQueue<T,U>::dequeue(T& value, const bool mode)
     return true;
 }
 
-template<typename T, typename U>
-inline void audioQueue<T,U>::clear()
+template<audioType T>
+inline void audioQueue<T>::clear()
 {
     head        .store(0);
     tail        .store(0);
     elementCount.store(0);
 }
 
-template<typename T, typename U>
-inline void audioQueue<T,U>::usageRefresh()
+template<audioType T>
+inline void audioQueue<T>::usageRefresh()
 {
     usage.store(static_cast<std::uint8_t>(static_cast<double>(elementCount.load()) / queue.size() * 100.0));
+    std::print("usage : {}\n", usage.load());
 }
 
-template<typename T, typename U>
-std::vector<T> audioQueue<T, U>::channelConversion(std::vector<T>& data, const std::size_t targetChannelNum)
+template<audioType T>
+void audioQueue<T>::resample(std::vector<T>& data, const std::size_t frames, const std::size_t targetSampleRate)
+{
+    const auto resampleRatio = static_cast<double>(targetSampleRate) / static_cast<double>(audioSampleRate);
+    const auto newSize = static_cast<size_t>(std::ceil(static_cast<double>(frames) * static_cast<double>(channelNum) * resampleRatio));
+    std::vector<T> temp(newSize);
+
+    SRC_STATE* srcState = src_new(SRC_SINC_BEST_QUALITY, channelNum, nullptr);
+
+    SRC_DATA srcData;
+    srcData.end_of_input    = false;
+    srcData.data_in         = data.data();
+    srcData.data_out        = temp.data();
+    srcData.input_frames    = data.size();
+    srcData.output_frames   = newSize;
+    srcData.src_ratio       = resampleRatio;
+
+    std::print("{}\n",src_strerror(src_process(srcState, &srcData)));
+
+    src_delete(srcState);
+
+    data = std::move(temp);
+    audioSampleRate = targetSampleRate;
+}
+
+template<audioType T>
+void audioQueue<T>::channelConversion(std::vector<T>& data, const std::size_t targetChannelNum)
 {
     const auto newSize = data.size() / channelNum * targetChannelNum;
     data.reserve(newSize);
@@ -140,34 +171,46 @@ std::vector<T> audioQueue<T, U>::channelConversion(std::vector<T>& data, const s
 #pragma endregion
 
 #pragma region Public APIs
-template<typename T, typename U>
-void audioQueue<T,U>::push(T*&& ptr, std::size_t frames, const std::size_t outputChannelNum, const std::size_t outputSampleRate)
+template<audioType T>
+void audioQueue<T>::push(T*&& ptr, std::size_t frames, const std::size_t outputChannelNum, const std::size_t outputSampleRate)
 {   
-    
-
+    /*
     const bool needChannelConversion = (outputChannelNum != channelNum);
-    const bool needResample          = (outputSampleRate != audioSampleRate);
+    */
+    const bool needResample          = (outputSampleRate != audioSampleRate); 
     const auto currentSize           = frames * channelNum;
-    std::list<T> temp;
+   
+    //debug
+    std::print("original size : {}\n",currentSize);
+    
+        
+    std::vector<T> temp;
     std::move(ptr, ptr + currentSize, std::back_inserter(temp));
-
+    /*
     if (needChannelConversion)
     {
         channelConversion(temp, outputChannelNum);
-    }
+    }*/
     if (needResample)
     {
-        //const auto sampleRateRatio = static_cast<double>(outputSampleRate) / static_cast<double>(audioSampleRate);
-        resample(temp,outputSampleRate);
+        resample(temp, frames, outputSampleRate);
     }
+    
     const auto finalSize = temp.size();
     const auto estimatedUsage = usage.load() + (finalSize * 100 / queue.size());
 
-    if (estimatedUsage >= upperThreshold) std::this_thread::sleep_for(std::chrono::milliseconds(inputDelay));
+    if (estimatedUsage >= upperThreshold) 
+    {
+        std::this_thread::sleep_for(std::chrono::milliseconds(inputDelay));
 
+
+        //debug
+        std::print("input delay called");
+    }
+    std::print("after size : {}\n", finalSize);
     for (auto i = 0; i < finalSize; i++)
     {
-        if (!(this->enqueue(out[i])))
+        if (!(this->enqueue(temp[i])))
         {
             std::print("Warning : push operation aborted, not enough space. {} elements are pushed.\n",i+1);
             break;
@@ -176,13 +219,13 @@ void audioQueue<T,U>::push(T*&& ptr, std::size_t frames, const std::size_t outpu
     usageRefresh();
 }
 
-template<typename T, typename U>
-void audioQueue<T,U>::pop(T*& ptr, std::size_t frames,const bool mode)
+template<audioType T>
+void audioQueue<T>::pop(T*& ptr, std::size_t frames,const bool mode)
 {   
     const auto size = frames * channelNum;
     const auto estimatedUsage = usage.load() >= (size * 100 / queue.size()) ? usage.load() - (size * 100 / queue.size()) : 0;
     
-    if (estimatedUsage <= lowerThreshold) std::this_thread::sleep_for(std::chrono::milliseconds(outputDelay));
+    if (estimatedUsage <= lowerThreshold) { std::this_thread::sleep_for(std::chrono::milliseconds(outputDelay)); std::print("output delay called");}
     for (auto i = 0; i < size; i++)
     {
        if (!this->dequeue(ptr[i],mode)) 
@@ -194,8 +237,8 @@ void audioQueue<T,U>::pop(T*& ptr, std::size_t frames,const bool mode)
     usageRefresh();
 }
 
-template<typename T, typename U>
-inline void audioQueue<T,U>::setCapacity(std::size_t newCapacity)
+template<audioType T>
+inline void audioQueue<T>::setCapacity(std::size_t newCapacity)
 {   
     if (newCapacity == queue.size()) return;
     else
@@ -205,8 +248,8 @@ inline void audioQueue<T,U>::setCapacity(std::size_t newCapacity)
     }
 }
 
-template<typename T, typename U>
-inline void audioQueue<T,U>::setDelay(const std::uint8_t lower, const std::uint8_t upper, const std::size_t iDelay, const std::size_t oDelay)
+template<audioType T>
+inline void audioQueue<T>::setDelay(const std::uint8_t lower, const std::uint8_t upper, const std::size_t iDelay, const std::size_t oDelay)
 {
     auto isInRange = [](const std::uint8_t val) { return val >= 0 && val <= 100; };
     if (isInRange(lowerThreshold) && isInRange(upperThreshold))
@@ -221,35 +264,3 @@ inline void audioQueue<T,U>::setDelay(const std::uint8_t lower, const std::uint8
 #pragma endregion
 
 #endif// audioQueue_H
-
-/*std::vector<T> temp0, temp1;
-
-    
-    if (resample)
-    {
-        SRC_STATE* srcState = src_new(SRC_SINC_BEST_QUALITY, channelNum, nullptr);
-
-        out = new T[newSize];
-
-        const auto resempleRatio = static_cast<double>(outputSampleRate) / static_cast<double>(audioSampleRate);
-        const auto newSize = static_cast<size_t>(std::ceil(static_cast<double>(frames) * static_cast<double>(outputChannelNum) * resampleRatio));
-
-        std::vector<T> temp0(newSize);
-
-        if (channelConversion && resample) std::vector<T> temp1(frames * outputChannelNum);
-        SRC_DATA srcData;
-        srcData.data_in         = temp.data();
-        srcData.data_out        = out;
-        srcData.input_frames    = temp.size();
-        srcData.output_frames   = newSize;
-        srcData.src_ratio       = resempleRatio;
-
-        const char* errorInfo = src_strerror(src_process(srcState, &srcData));
-
-        src_delete(srcState);
-
-        sampleRate = outputSampleRate;
-
-        return true;
-
-    }*/

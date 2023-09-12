@@ -20,10 +20,10 @@ static void sigIntHandler(int) {exit_loop = true;}
  * Constants and data queue.
  */
 #pragma region Global definition
-constexpr auto SAMPLE_RATE					= 44100;
+constexpr auto SAMPLE_RATE					= 48000;
 constexpr auto PA_BUFFER_SIZE				= 128;
 constexpr auto NDI_TIMEOUT					= 1000;
-constexpr auto QUEUE_SIZE_MULTIPLIER		= 1.5;
+constexpr auto QUEUE_SIZE_MULTIPLIER		= 2;
 audioQueue<float> NDIdata(0);
 audioQueue<float> MicroInput(0);
 #pragma endregion
@@ -86,7 +86,7 @@ void NDIAudioTread()
 			if(audioDataNDI.sample_rate != NDIdata.sampleRate()) NDIdata.setSampleRate(audioDataNDI.sample_rate);
 			NDIdata.setCapacity (static_cast<std::size_t>(dataSize * QUEUE_SIZE_MULTIPLIER));
 
-			NDIdata.push(std::move(audioDataNDI.p_data), audioDataNDI.no_samples,44100);
+			NDIdata.push(std::move(audioDataNDI.p_data), audioDataNDI.no_samples,2,SAMPLE_RATE);
 
 			delete[] audioDataNDI.p_data;
 		}
