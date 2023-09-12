@@ -76,7 +76,7 @@ class audioQueue
 template<audioType T>
 inline audioQueue<T>::audioQueue(const std::size_t initialCapacity)
     :   queue(initialCapacity+1), head(0), tail(0),usage(0), audioSampleRate(44100), channelNum(1), 
-    elementCount(0), lowerThreshold(20), upperThreshold(80), inputDelay(45), outputDelay(15) {}
+    elementCount(0), lowerThreshold(0), upperThreshold(100), inputDelay(45), outputDelay(15) {}
 #pragma endregion
 
 #pragma region Private member functions
@@ -119,11 +119,7 @@ inline void audioQueue<T>::clear()
 }
 
 template<audioType T>
-inline void audioQueue<T>::usageRefresh()
-{
-    usage.store(static_cast<std::uint8_t>(static_cast<double>(elementCount.load()) / queue.size() * 100.0));
-    std::print("usage : {}\n", usage.load());
-}
+inline void audioQueue<T>::usageRefresh(){ usage.store(static_cast<std::uint8_t>(static_cast<double>(elementCount.load()) / queue.size() * 100.0)); }
 
 template<audioType T>
 void audioQueue<T>::resample(std::vector<T>& data, const std::size_t frames, const std::size_t targetSampleRate)
@@ -135,15 +131,19 @@ void audioQueue<T>::resample(std::vector<T>& data, const std::size_t frames, con
     SRC_STATE* srcState = src_new(SRC_SINC_BEST_QUALITY, channelNum, nullptr);
 
     SRC_DATA srcData;
-    srcData.end_of_input    = false;
+    srcData.end_of_input    = true;
     srcData.data_in         = data.data();
     srcData.data_out        = temp.data();
-    srcData.input_frames    = data.size();
+    srcData.input_frames    = frames;
     srcData.output_frames   = newSize;
     srcData.src_ratio       = resampleRatio;
 
-    std::print("{}\n",src_strerror(src_process(srcState, &srcData)));
-
+    auto errStr = src_strerror(src_process(srcState, &srcData));
+    std::print("{}\n", errStr);
+    if (errStr != "Input and output data arrays overlap.")
+    {
+        std::print("overlap error :\ninput frame : {}\noutput frame : {}\ninput frame used : {}\noutput frame gen : {}\n", data.size(), temp.size(), srcData.input_frames_used, srcData.output_frames_gen);
+    }
     src_delete(srcState);
 
     data = std::move(temp);
@@ -179,11 +179,7 @@ void audioQueue<T>::push(T*&& ptr, std::size_t frames, const std::size_t outputC
     */
     const bool needResample          = (outputSampleRate != audioSampleRate); 
     const auto currentSize           = frames * channelNum;
-   
-    //debug
-    std::print("original size : {}\n",currentSize);
     
-        
     std::vector<T> temp;
     std::move(ptr, ptr + currentSize, std::back_inserter(temp));
     /*
@@ -199,20 +195,12 @@ void audioQueue<T>::push(T*&& ptr, std::size_t frames, const std::size_t outputC
     const auto finalSize = temp.size();
     const auto estimatedUsage = usage.load() + (finalSize * 100 / queue.size());
 
-    if (estimatedUsage >= upperThreshold) 
-    {
-        std::this_thread::sleep_for(std::chrono::milliseconds(inputDelay));
-
-
-        //debug
-        std::print("input delay called");
-    }
-    std::print("after size : {}\n", finalSize);
+    if (estimatedUsage >= upperThreshold) std::this_thread::sleep_for(std::chrono::milliseconds(inputDelay));
     for (auto i = 0; i < finalSize; i++)
     {
         if (!(this->enqueue(temp[i])))
         {
-            std::print("Warning : push operation aborted, not enough space. {} elements are pushed.\n",i+1);
+            std::print("Warning : push operation aborted, {} elements are pushed.\n",i+1);
             break;
         }
     }
@@ -225,7 +213,7 @@ void audioQueue<T>::pop(T*& ptr, std::size_t frames,const bool mode)
     const auto size = frames * channelNum;
     const auto estimatedUsage = usage.load() >= (size * 100 / queue.size()) ? usage.load() - (size * 100 / queue.size()) : 0;
     
-    if (estimatedUsage <= lowerThreshold) { std::this_thread::sleep_for(std::chrono::milliseconds(outputDelay)); std::print("output delay called");}
+    if (estimatedUsage <= lowerThreshold) std::this_thread::sleep_for(std::chrono::milliseconds(outputDelay));
     for (auto i = 0; i < size; i++)
     {
        if (!this->dequeue(ptr[i],mode)) 

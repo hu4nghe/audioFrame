@@ -23,7 +23,7 @@ static void sigIntHandler(int) {exit_loop = true;}
 constexpr auto SAMPLE_RATE					= 48000;
 constexpr auto PA_BUFFER_SIZE				= 128;
 constexpr auto NDI_TIMEOUT					= 1000;
-constexpr auto QUEUE_SIZE_MULTIPLIER		= 2;
+constexpr auto QUEUE_SIZE_MULTIPLIER		= 200;
 audioQueue<float> NDIdata(0);
 audioQueue<float> MicroInput(0);
 #pragma endregion
@@ -129,7 +129,7 @@ void portAudioOutputThread()
 										 0,								// Input  channels
 										 2,								// Output channels
 										 paFloat32,						// Sample format
-									     SAMPLE_RATE,					// 44100
+									     SAMPLE_RATE,					// Sample rate
 										 PA_BUFFER_SIZE,				// 128
 										 portAudioOutputCallback,		// Callback function called
 										 nullptr));						// No user NDIdata passed
