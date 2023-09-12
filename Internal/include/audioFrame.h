@@ -41,18 +41,18 @@ class audioQueue
                        void  push               (                 T*  &&ptr, 
                                                  const  std:: size_t    frames,
                                                  const  std:: size_t    outputChannelNum,
-                                                 const  std:: size_t    outputSampleRate);
+                                                 const  std:: size_t    outputSampleRate);      
                        void  pop                (                 T*   &ptr, 
                                                  const  std:: size_t    frames,
                                                  const          bool    mode);                
 
-    inline             void  setSampleRate      (const  std:: size_t    sRate)               { audioSampleRate = sRate; }
-    inline             void  setChannelNum      (const  std:: size_t    cNum )               { channelNum = cNum; }
+    inline             void  setSampleRate      (const  std:: size_t    sRate){ audioSampleRate = sRate; }
+    inline             void  setChannelNum      (const  std:: size_t    cNum ){ channelNum = cNum; }
                        void  setCapacity        (const  std:: size_t    newCapacity);
-//                     void  setVolume          (const  std::uint8_t    volume);                     
-                       void  setDelay           (const  std::uint8_t    lower, 
-                                                 const  std::uint8_t    upper, 
-                                                 const  std:: size_t    iDelay, 
+//                     void  setVolume          (const  std::uint8_t    volume);
+                       void  setDelay           (const  std::uint8_t    lower,
+                                                 const  std::uint8_t    upper,
+                                                 const  std:: size_t    iDelay,
                                                  const  std:: size_t    oDelay);
                
     inline      std::size_t  channels           () const { return channelNum; }
@@ -125,7 +125,7 @@ template<audioType T>
 void audioQueue<T>::resample(std::vector<T>& data, const std::size_t frames, const std::size_t targetSampleRate)
 {
     const auto resampleRatio = static_cast<double>(targetSampleRate) / static_cast<double>(audioSampleRate);
-    const auto newSize = static_cast<size_t>(std::ceil(static_cast<double>(frames) * static_cast<double>(channelNum) * resampleRatio));
+    const auto newSize = static_cast<size_t>(static_cast<double>(frames) * static_cast<double>(channelNum) * resampleRatio);
     std::vector<T> temp(newSize);
 
     SRC_STATE* srcState = src_new(SRC_SINC_BEST_QUALITY, channelNum, nullptr);
@@ -135,7 +135,7 @@ void audioQueue<T>::resample(std::vector<T>& data, const std::size_t frames, con
     srcData.data_in         = data.data();
     srcData.data_out        = temp.data();
     srcData.input_frames    = frames;
-    srcData.output_frames   = newSize;
+    srcData.output_frames   = static_cast<int>(frames * resampleRatio);
     srcData.src_ratio       = resampleRatio;
 
     auto errStr = src_strerror(src_process(srcState, &srcData));
