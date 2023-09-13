@@ -1,65 +1,180 @@
-﻿#include "portaudio.h"
-#include "sndfile.hh"
-#include "audioFrame.h"
+﻿#include <iostream>
+#include <list>
+#include <print>
 
-#define PA_SAMPLE_TYPE paFloat32
-constexpr auto PA_BUFFER_SIZE = 32;
+int main() {
+	/*conversion draft
+	std::list<int> a = {1, 2, 3, 4, 5, 6, 7, 8, 9 ,10,11,12,13,14,15,16,17,18,19,20,21,22,23,24,25,26,27,28,29,30,31,32,33,34,35,36};
+	int x = 6; 
+	int y = 2; 
 
-static int NDIAudioCallback(const void* inputBuffer,
-                         void* outputBuffer,
-                         unsigned long framesPerBuffer,
-                         const PaStreamCallbackTimeInfo* timeInfo,
-                         PaStreamCallbackFlags statusFlags,
-                         void* userData)
-{
-    auto out = static_cast <float*>(outputBuffer);
-    auto sndFile = static_cast<audioFrame<float>*>(userData);      
+	int copyCount			= std::min(x, y);
+	int modificationCount	= std::abs(x - y);
+	
 
-    sndFile->diffuse(out, framesPerBuffer);
-    return paContinue;
+	if (x < y)
+	{
+		for (auto iter = std::next(a.begin(), copyCount);iter != a.end();std::advance(iter, copyCount+ modificationCount))
+		{
+			a.insert(iter, modificationCount, 0);
+		}
+		a.insert(a.end(), modificationCount, 0);
+	}
+	else //Convert audio from mono/stereo to a multi-channel.
+	{
+		auto naut = a.end();
+		for (auto iter = std::next(a.begin(), copyCount); iter != a.end(); std::advance(iter, copyCount))
+		{
+			std::print("current iter pos : {}\n", *iter);
+			for (auto i = 0; i < modificationCount; i++)
+			{
+				if (std::next(iter, 1) != a.end())
+					iter = a.erase(iter);
+				else
+				{
+					a.erase(iter);
+					goto x;
+				}
+
+			}		
+		}
+	}
+	x:
+	for (const auto& element : a) 
+	{
+		std::cout << element << " ";
+	}
+	std::cout << std::endl;
+*/
+	size_t outputSampleRate = 48000;
+	size_t audioSampleRate = 44100;
+	size_t frames = 8192;
+	uint8_t outputChannelNum = 2;
+	const auto resampleRatio = static_cast<double>(outputSampleRate) / static_cast<double>(audioSampleRate);
+	const auto newSize = static_cast<size_t>(std::ceil(static_cast<double>(frames) * static_cast<double>(outputChannelNum) * resampleRatio));
+	std::print("the ratio : {}, newSize : {}\n", resampleRatio, newSize);
+	return 0;
 }
 
-void error_check(PaError err)
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+/* 
+
+static std::atomic<bool> exit_loop(false);
+static void sigIntHandler(int) { exit_loop = true; }
+
+inline void  PAErrorCheck(PaError err) { if (err) { std::print("PortAudio error : {}.\n", Pa_GetErrorText(err)); exit(EXIT_FAILURE); } }
+audioQueue<float> MicroInput(0);
+constexpr auto QUEUE_SIZE_MULTIPLIER = 1.8;
+
+static int portAudioInputCallback(const void*						inputBuffer,
+										void*						outputBuffer,
+										unsigned long				framesPerBuffer,
+								  const PaStreamCallbackTimeInfo*	timeInfo,
+										PaStreamCallbackFlags		statusFlags,
+										void* UserData)
 {
-    if (err != paNoError)
-    {
-        std::cout << std::format("Portaudio error : {} \n", Pa_GetErrorText(err));
-        exit(EXIT_FAILURE);
-    }
+	auto in = static_cast<const float*>(inputBuffer);
+	MicroInput.setCapacity(8192);
+	MicroInput.setChannelNum(2);
+	MicroInput.push(in, framesPerBuffer);
+	return paContinue;
+}
+
+static int portAudioOutputCallback(const void* inputBuffer,
+	void* outputBuffer,
+	unsigned long				framesPerBuffer,
+	const PaStreamCallbackTimeInfo* timeInfo,
+	PaStreamCallbackFlags		statusFlags,
+	void* UserData)
+{
+	auto out = static_cast<float*>(outputBuffer);
+	MicroInput.pop(out, framesPerBuffer,true);
+	std::print("out : poped\n");
+	return paContinue;
+}
+
+
+void portAudioInputThread()
+{
+	PaStream* streamIn;
+	PAErrorCheck(Pa_OpenDefaultStream( &streamIn,						// PaStream ptr
+										2,								// Input  channels
+										0,								// Output channels
+										paFloat32,						// Sample format
+										44100,					// 44100
+										28,					// 128
+										portAudioInputCallback,			// Callback function called
+										nullptr));						// No user NDIdata passed
+	PAErrorCheck(Pa_StartStream(streamIn));
+	while (!exit_loop) {}
+	PAErrorCheck(Pa_StopStream(streamIn));
+	PAErrorCheck(Pa_CloseStream(streamIn));
+}
+
+
+void paOut()
+{
+	PaStream* streamIn;
+	PAErrorCheck(Pa_OpenDefaultStream(&streamIn,						// PaStream ptr
+										0,								// Input  channels
+										2,								// Output channels
+										paFloat32,						// Sample format
+										44100,					// 44100
+										128,					// 128
+										portAudioOutputCallback,			// Callback function called
+										nullptr));						// No user NDIdata passed
+	PAErrorCheck(Pa_StartStream(streamIn));
+	while (!exit_loop) 
+	{
+		if (!MicroInput.size()) Pa_AbortStream(streamIn);
+		if (MicroInput.size() && Pa_IsStreamStopped(streamIn)) Pa_StartStream(streamIn);
+	}
+	PAErrorCheck(Pa_StopStream(streamIn));
+	PAErrorCheck(Pa_CloseStream(streamIn));
 }
 
 int main()
 {
-    std::filesystem::path inpath("D:/Music/Mahler Symphony No.2/Mahler- Symphony #2 In C Minor, 'Resurrection' - 5a. Im Tempo Des Scherzos.wav");
-    audioFrame<float> input;
-    input.readSoundFile(inpath);
-
-
-
-    
-    std::cout << "resampled " << std::endl;
-    
-    
-
-    std::cin.get();
-
-
-
-
-
-    // Set up PortAudio stream and start
-    error_check(Pa_Initialize());
-    PaStream* stream;
-    error_check(Pa_OpenDefaultStream(&stream, 0, 2, PA_SAMPLE_TYPE, 48000, PA_BUFFER_SIZE, NDIAudioCallback, &input));
-    error_check(Pa_StartStream(stream));
-
-    std::cout << "Playing..." << std::endl;
-    std::cin.get();
-
-    // Stop
-    error_check(Pa_StopStream(stream));
-    error_check(Pa_CloseStream(stream));
-    Pa_Terminate();
-
-    return 0;
-}
+	Pa_Initialize();
+	std::thread portaudioIn(portAudioInputThread);
+	std::thread portaudioOUt(paOut);
+	portaudioIn.join();
+	portaudioOUt.join();
+	PAErrorCheck(Pa_Terminate());
+}*/

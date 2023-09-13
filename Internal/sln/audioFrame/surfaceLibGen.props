@@ -1,0 +1,23 @@
+<?xml version="1.0" encoding="utf-8"?>
+<Project ToolsVersion="4.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <ImportGroup Label="PropertySheets" />
+  <PropertyGroup Label="UserMacros" />
+  <PropertyGroup>
+    <IncludePath>C:\Users\Glibc\source\repos\hu4nghe\audioFrame\External\include;C:\Users\Glibc\source\repos\hu4nghe\audioFrame\Internal\include;$(IncludePath)</IncludePath>
+    <LibraryPath>C:\Users\Glibc\source\repos\hu4nghe\audioFrame\Internal\lib;C:\Users\Glibc\source\repos\hu4nghe\audioFrame\External\lib;$(LibraryPath)</LibraryPath>
+  </PropertyGroup>
+  <ItemDefinitionGroup>
+    <ClCompile>
+      <Optimization>MaxSpeed</Optimization>
+      <BasicRuntimeChecks>Default</BasicRuntimeChecks>
+      <RuntimeLibrary>MultiThreadedDebug</RuntimeLibrary>
+      <LanguageStandard>stdcpplatest</LanguageStandard>
+      <LanguageStandard_C>stdc17</LanguageStandard_C>
+      <EnableModules>true</EnableModules>
+    </ClCompile>
+    <Link>
+      <AdditionalDependencies>C:\Users\Glibc\source\repos\hu4nghe\audioFrame\External\lib\portaudio_x64.lib;C:\Users\Glibc\source\repos\hu4nghe\audioFrame\External\lib\Processing.NDI.Lib.x64.lib;C:\Users\Glibc\source\repos\hu4nghe\audioFrame\External\lib\samplerate.lib;C:\Users\Glibc\source\repos\hu4nghe\audioFrame\External\lib\sndfile.lib;%(AdditionalDependencies)</AdditionalDependencies>
+    </Link>
+  </ItemDefinitionGroup>
+  <ItemGroup />
+</Project>
