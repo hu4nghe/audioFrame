@@ -1,12 +1,10 @@
-#ifndef audioQueue_H
-#define audioQueue_H
+#ifndef AUDIO_QUEUE_H
+#define AUDIO_QUEUE_H
 
-#include <algorithm>
 #include <atomic>
 #include <concepts>
 #include <print>
 #include <thread>
-#include <type_traits>
 #include <vector>
 
 #include "samplerate.h"
@@ -67,7 +65,7 @@ class audioQueue
                        void  resample           (      std::vector<T>  &data,
                                                  const std::  size_t    frames,
                                                  const std::  size_t    targetSampleRate);
-                       void channelConversion  (       std::vector<T>  &data,
+                       void channelConversion   (      std::vector<T>  &data,
                                                  const std::  size_t    targetChannelNum);
 };
 
@@ -150,15 +148,34 @@ void audioQueue<T>::channelConversion(std::vector<T>& data, const std::size_t ta
     const auto newSize = data.size() / channelNum * targetChannelNum;
     data.reserve(newSize);
 
-    //channel conversion
-    for (auto i = 0; i < newSize; i += channelNum)
-    {
-        for (auto j = 0; j < (targetChannelNum - channelNum); j++)
-        {
+    const auto copyCount = std::min(channelNum, targetChannelNum);
+    const auto modifCount = std::abs(channelNum - targetChannelNum);
 
+    if (channelNum < targetChannelNum)
+    {
+        //case original channel number < target number
+    }
+    else
+    {
+        for (auto iter = std::next(a.begin(), copyCount); iter != a.end(), std::advance(iter, copyCount))
+        {
+            for (auto i = 0; i < modifCount; i++)
+            {
+                if (std::next(iter, 1) != a.end())
+                {
+                    iter = a.erase(iter);
+                }
+                else
+                {
+                    a.erase(iter);
+                    goto convertEnd;
+                }
+            }
         }
     }
 
+
+convertEnd:
     channelNum = targetChannelNum;
 }
 
@@ -245,4 +262,4 @@ inline void audioQueue<T>::setDelay(const std::uint8_t lower, const std::uint8_t
 }
 #pragma endregion
 
-#endif// audioQueue_H
+#endif// AUDIO_QUEUE_H

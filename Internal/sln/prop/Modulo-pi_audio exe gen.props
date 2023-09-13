@@ -3,8 +3,8 @@
   <ImportGroup Label="PropertySheets" />
   <PropertyGroup Label="UserMacros" />
   <PropertyGroup>
-    <IncludePath>C:\Users\Modulo\Desktop\WorkSpace\External\include;C:\Users\Modulo\Desktop\WorkSpace\Internal\include;$(IncludePath)</IncludePath>
-    <LibraryPath>C:\Users\Modulo\Desktop\WorkSpace\External\lib;C:\Users\Modulo\Desktop\WorkSpace\Internal\lib;$(LibraryPath)</LibraryPath>
+    <IncludePath>C:\Users\Modulo\source\repos\audioFrame\External\include;C:\Users\Modulo\source\repos\audioFrame\Internal\include;$(IncludePath)</IncludePath>
+    <LibraryPath>C:\Users\Modulo\source\repos\audioFrame\External\lib;C:\Users\Modulo\source\repos\audioFrame\Internal\lib;$(LibraryPath)</LibraryPath>
   </PropertyGroup>
   <ItemDefinitionGroup>
     <ClCompile>
@@ -22,7 +22,7 @@
       <RuntimeLibrary>MultiThreaded</RuntimeLibrary>
     </ClCompile>
     <Link>
-      <AdditionalDependencies>C:\Users\Modulo\Desktop\WorkSpace\External\lib\sndfile.lib;C:\Users\Modulo\Desktop\WorkSpace\External\lib\portaudio_x64.lib;C:\Users\Modulo\Desktop\WorkSpace\External\lib\Processing.NDI.Lib.x64.lib;C:\Users\Modulo\Desktop\WorkSpace\External\lib\samplerate.lib;C:\Users\Modulo\Desktop\WorkSpace\Internal\lib\audioFrame.lib;%(AdditionalDependencies)</AdditionalDependencies>
+      <AdditionalDependencies>C:\Users\Modulo\source\repos\audioFrame\External\lib\sndfile.lib;C:\Users\Modulo\source\repos\audioFrame\External\lib\portaudio_x64.lib;C:\Users\Modulo\source\repos\audioFrame\External\lib\Processing.NDI.Lib.x64.lib;C:\Users\Modulo\source\repos\audioFrame\External\lib\samplerate.lib;C:\Users\Modulo\source\repos\audioFrame\Internal\lib\audioFrame.lib;%(AdditionalDependencies)</AdditionalDependencies>
       <LinkTimeCodeGeneration>Default</LinkTimeCodeGeneration>
     </Link>
   </ItemDefinitionGroup>

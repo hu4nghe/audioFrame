@@ -87,8 +87,6 @@ void NDIAudioTread()
 			NDIdata.setCapacity (static_cast<std::size_t>(dataSize * QUEUE_SIZE_MULTIPLIER));
 
 			NDIdata.push(std::move(audioDataNDI.p_data), audioDataNDI.no_samples,2,SAMPLE_RATE);
-
-			delete[] audioDataNDI.p_data;
 		}
 		
 	}
@@ -108,13 +106,7 @@ static int portAudioOutputCallback(const void*					   inputBuffer,
 										 void*					   UserData)
 {
 	auto out = static_cast<float*>(outputBuffer);
-	memset(out, 0, framesPerBuffer * 2);
-	//auto in = static_cast<const float*>(inputBuffer);
-	//MicroInput.setCapacity(8192);
-	//icroInput.setChannelNum(2);
-	//MicroInput.push(in, framesPerBuffer);
 	NDIdata.pop(out, framesPerBuffer, false);
-	//MicroInput.pop(out, framesPerBuffer,true);
 	return paContinue;
 }
 
@@ -168,35 +160,3 @@ int main()
 	PAErrorCheck(Pa_Terminate());
 	return 0;
 }
-/*
-#pragma region Microphone In
-static int portAudioInputCallback(const void* inputBuffer,
-	void* outputBuffer,
-	unsigned long				framesPerBuffer,
-	const PaStreamCallbackTimeInfo* timeInfo,
-	PaStreamCallbackFlags		statusFlags,
-	void* UserData)
-{
-	auto in = static_cast<const float*>(inputBuffer);
-	MicroInput.setCapacity(8192);
-	MicroInput.setChannelNum(2);
-	MicroInput.push(in, framesPerBuffer);
-	return paContinue;
-}
-void portAudioInputThread()
-{
-	PaStream* streamIn;
-	PAErrorCheck(Pa_OpenDefaultStream(&streamIn,						// PaStream ptr
-		2,								// Input  channels
-		0,								// Output channels
-		paFloat32,						// Sample format
-		44100,					// 44100
-		28,					// 128
-		portAudioInputCallback,			// Callback function called
-		nullptr));						// No user NDIdata passed
-	PAErrorCheck(Pa_StartStream(streamIn));
-	while (!exit_loop) {}
-	PAErrorCheck(Pa_StopStream(streamIn));
-	PAErrorCheck(Pa_CloseStream(streamIn));
-}
-#pragma endregion*/
