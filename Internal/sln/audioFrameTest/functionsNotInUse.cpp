@@ -159,3 +159,13 @@ inline bool audioQueue<T, U>::readSoundFile(const fs::path filePath)
 	std::print("the metainfo is : {}",meta);
 }
 */
+
+
+//if (NDIdata.size())
+		//{
+			//auto *NDIout = new float [PA_BUFFER_SIZE];
+			//NDIdata.pop(NDIout,PA_BUFFER_SIZE, false);
+			//output.push(std::move(NDIout), PA_BUFFER_SIZE, 2, SAMPLE_RATE);
+//if (!output.size()) Pa_AbortStream(streamOut);
+//if (output.size() && Pa_IsStreamStopped(streamOut)) Pa_StartStream(streamOut);
+//}

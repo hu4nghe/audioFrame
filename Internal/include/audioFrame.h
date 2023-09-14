@@ -157,17 +157,17 @@ void audioQueue<T>::channelConversion(std::vector<T>& data, const std::size_t ta
     }
     else
     {
-        for (auto iter = std::next(a.begin(), copyCount); iter != a.end(), std::advance(iter, copyCount))
+        for (auto iter = std::next(data.begin(), copyCount); iter != data.end(); std::advance(iter, copyCount))
         {
             for (auto i = 0; i < modifCount; i++)
             {
-                if (std::next(iter, 1) != a.end())
+                if (std::next(iter, 1) != data.end())
                 {
-                    iter = a.erase(iter);
+                    iter = data.erase(iter);
                 }
                 else
                 {
-                    a.erase(iter);
+                    data.erase(iter);
                     goto convertEnd;
                 }
             }

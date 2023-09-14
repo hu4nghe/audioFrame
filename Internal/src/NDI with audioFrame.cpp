@@ -20,12 +20,11 @@ static void sigIntHandler(int) {exit_loop = true;}
  * Constants and data queue.
  */
 #pragma region Global definition
-constexpr auto SAMPLE_RATE					= 48000;
+constexpr auto SAMPLE_RATE					= 44100;
 constexpr auto PA_BUFFER_SIZE				= 128;
 constexpr auto NDI_TIMEOUT					= 1000;
 constexpr auto QUEUE_SIZE_MULTIPLIER		= 200;
 audioQueue<float> NDIdata(0);
-audioQueue<float> MicroInput(0);
 #pragma endregion
 
 /**
@@ -47,15 +46,21 @@ void NDIAudioTread()
 	#pragma region NDI Initialization
 	// Create a NDI finder and try to find a source NDI 
 	const NDIlib_find_create_t NDIFindCreateDesc;
-	auto pNDIFind = NDIErrorCheck(NDIlib_find_create_v2(&NDIFindCreateDesc));
+	auto pNDIFind = NDIErrorCheck(NDIlib_find_create_v2(&NDIFindCreateDesc)); 
 	uint32_t noSources = 0;
 	const NDIlib_source_t* pSources = nullptr;
-	while (!exit_loop && !noSources)
+	int sourceCount = 0;
+	while (!noSources)
 	{
 		NDIlib_find_wait_for_sources(pNDIFind, NDI_TIMEOUT);
 		pSources = NDIlib_find_get_current_sources(pNDIFind, &noSources);
+		sourceCount++;
 	}
 	NDIErrorCheck(pSources);
+	
+	for (int i = 0; i < sourceCount; i++)
+		std::print("Source {}: {}\n", i , pSources[i].p_ndi_name);
+	
 	//Create a NDI receiver if the NDI source is found.
 	NDIlib_recv_create_v3_t NDIRecvCreateDesc;
 	if(pSources)NDIRecvCreateDesc.source_to_connect_to	= *pSources;
@@ -74,11 +79,11 @@ void NDIAudioTread()
 		auto NDI_frame_type = NDIlib_recv_capture_v2(pNDI_recv, nullptr, &audioInput, nullptr, NDI_TIMEOUT);
 		if(NDI_frame_type == NDIlib_frame_type_audio)
 		{
-			const std::size_t dataSize = audioInput.no_samples * audioInput.no_channels;
+			const auto dataSize = static_cast<size_t>(audioInput.no_samples) * audioInput.no_channels;
 
 			// Create a NDI audio object and convert it to interleaved float format.
 			NDIlib_audio_frame_interleaved_32f_t audioDataNDI;
-			audioDataNDI.p_data = new float[dataSize];
+			audioDataNDI.p_data	= new float[dataSize];
 			NDIlib_util_audio_to_interleaved_32f_v2(&audioInput, &audioDataNDI);
 			NDIlib_recv_free_audio_v2(pNDI_recv, &audioInput);
 
@@ -87,6 +92,7 @@ void NDIAudioTread()
 			NDIdata.setCapacity (static_cast<std::size_t>(dataSize * QUEUE_SIZE_MULTIPLIER));
 
 			NDIdata.push(std::move(audioDataNDI.p_data), audioDataNDI.no_samples,2,SAMPLE_RATE);
+			//NDIlib_audio_frame_interleaved_32f_t.p_data's ownership is moved to audioQueue, no need to delete[] explicitly.
 		}
 		
 	}

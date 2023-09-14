@@ -1,58 +1,53 @@
 ﻿#include <iostream>
 #include <list>
 #include <print>
+#include <vector>
+#include "audioFrame.h"
 
-int main() {
-	/*conversion draft
-	std::list<int> a = {1, 2, 3, 4, 5, 6, 7, 8, 9 ,10,11,12,13,14,15,16,17,18,19,20,21,22,23,24,25,26,27,28,29,30,31,32,33,34,35,36};
-	int x = 6; 
-	int y = 2; 
+audioQueue<float> queue(9);
+audioQueue<float> out(9);
 
-	int copyCount			= std::min(x, y);
-	int modificationCount	= std::abs(x - y);
+void thread1()
+{
+	std::vector<float> b{ 9,8,7,6,5,4,3,2,1 };
+	queue.push(b.data(),b.size(), 2, 44100);
+
+}
+void thread2()
+{
+	float* ptr = new float[9];
+	queue.pop(ptr, queue.size(), false);
+	std::this_thread::sleep_for(std::chrono::seconds(1));
+	for (int i = 0; i < 9; i++)
+	{
+		std::print("{}\n", ptr[i]);
+	}
+
+	out.push(std::move(ptr), queue.size(), 2, 44100);
+
+	float* ptr1 = new float[9];
+	out.pop(ptr1, out.size(), false);
+
+	for (int i = 0; i < 9; i++)
+	{
+		std::print("{}\n", ptr1[i]);
+	}
+
+	delete[] ptr1;
+}
+
+
+int main() 
+{
+	std::thread ndiThread(thread1);
+	std::vector<float> a{ 1,2,3,4,5,6,7,8,9 };
 	
+	queue.push(a.data(), a.size(), 2, 44100);
+	std::thread portaudio(thread2);
 
-	if (x < y)
-	{
-		for (auto iter = std::next(a.begin(), copyCount);iter != a.end();std::advance(iter, copyCount+ modificationCount))
-		{
-			a.insert(iter, modificationCount, 0);
-		}
-		a.insert(a.end(), modificationCount, 0);
-	}
-	else //Convert audio from mono/stereo to a multi-channel.
-	{
-		auto naut = a.end();
-		for (auto iter = std::next(a.begin(), copyCount); iter != a.end(); std::advance(iter, copyCount))
-		{
-			std::print("current iter pos : {}\n", *iter);
-			for (auto i = 0; i < modificationCount; i++)
-			{
-				if (std::next(iter, 1) != a.end())
-					iter = a.erase(iter);
-				else
-				{
-					a.erase(iter);
-					goto x;
-				}
 
-			}		
-		}
-	}
-	x:
-	for (const auto& element : a) 
-	{
-		std::cout << element << " ";
-	}
-	std::cout << std::endl;
-*/
-	size_t outputSampleRate = 48000;
-	size_t audioSampleRate = 44100;
-	size_t frames = 8192;
-	uint8_t outputChannelNum = 2;
-	const auto resampleRatio = static_cast<double>(outputSampleRate) / static_cast<double>(audioSampleRate);
-	const auto newSize = static_cast<size_t>(std::ceil(static_cast<double>(frames) * static_cast<double>(outputChannelNum) * resampleRatio));
-	std::print("the ratio : {}, newSize : {}\n", resampleRatio, newSize);
+	ndiThread.detach();
+	portaudio.join();
 	return 0;
 }
 
