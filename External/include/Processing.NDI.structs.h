@@ -196,7 +196,7 @@ typedef struct NDIlib_source_t {
 
 		// We used to use an IP address before we used the more general URL notification this is now
 		// depreciated but maintained for compatibility.
-		PROCESSINGNDILIB_DEPRECATED const char* p_ip_address;
+		const char* p_ip_address;
 	};
 
 #if NDILIB_CPP_DEFAULT_CONSTRUCTORS

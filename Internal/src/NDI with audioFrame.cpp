@@ -1,4 +1,5 @@
 ﻿#include <csignal>
+#include <iostream>
 #include "Processing.NDI.Lib.h" 
 #include "portaudio.h"
 #include "audioFrame.h"
@@ -47,26 +48,46 @@ void NDIAudioTread()
 	// Create a NDI finder and try to find a source NDI 
 	const NDIlib_find_create_t NDIFindCreateDesc;
 	auto pNDIFind = NDIErrorCheck(NDIlib_find_create_v2(&NDIFindCreateDesc)); 
-	uint32_t noSources = 0;
+	uint32_t numSources = 0;
 	const NDIlib_source_t* pSources = nullptr;
-	int sourceCount = 0;
-	while (!noSources)
+	while (!numSources)
 	{
 		NDIlib_find_wait_for_sources(pNDIFind, NDI_TIMEOUT);
-		pSources = NDIlib_find_get_current_sources(pNDIFind, &noSources);
-		sourceCount++;
+		pSources = NDIlib_find_get_current_sources(pNDIFind, &numSources);
 	}
 	NDIErrorCheck(pSources);
 	
-	for (int i = 0; i < sourceCount; i++)
-		std::print("Source {}: {}\n", i , pSources[i].p_ndi_name);
-	
-	//Create a NDI receiver if the NDI source is found.
+	for (int i = 0; i < numSources; i++)
+		std::print("Source {}\nName : {}\nIP   : {}\n\n", i , pSources[i].p_ndi_name, pSources[i].p_url_address);
+
+	std::print("Please enter the URL of the source that you want to connect to.\n");
+
 	NDIlib_recv_create_v3_t NDIRecvCreateDesc;
-	if(pSources)NDIRecvCreateDesc.source_to_connect_to	= *pSources;
-	NDIRecvCreateDesc.p_ndi_recv_name					= "Audio Receiver";
+	std::string url;
+	bool found = false;
+	do 
+	{
+		std::cin >> url;
+		for (int i = 0; i < numSources; i++) 
+		{
+			if (url == pSources[i].p_url_address) 
+			{
+				NDIRecvCreateDesc.source_to_connect_to = pSources[i];
+				std::print("You are now connecting to {},IP :{}", pSources[i].p_ndi_name,pSources[i].p_url_address);
+				found = true;
+				break;
+			}
+		}
+		if (!found) std::print("No source matched! Please try again.\n");
+	} while (!found);
+	
+	
+	std::string name=NDIRecvCreateDesc.source_to_connect_to.p_ndi_name;
+	name += " Receiver";
+	NDIRecvCreateDesc.p_ndi_recv_name = name.c_str();
 
 	auto pNDI_recv = NDIErrorCheck(NDIlib_recv_create_v3(&NDIRecvCreateDesc));
+	std::print("playing...\n");
 	NDIlib_find_destroy(pNDIFind);
 	#pragma endregion
 	
@@ -136,7 +157,6 @@ void portAudioOutputThread()
 
 #pragma region PA Callback playing loop
 
-	std::print("playing...\n");
 	while (!exit_loop)
 	{
 		if (!NDIdata.size()) Pa_AbortStream(streamOut);

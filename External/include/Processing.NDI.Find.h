@@ -47,7 +47,7 @@ typedef struct NDIlib_find_create_t {
 	// though they are not mDNS discoverable. An example might be "12.0.0.8,13.0.12.8". When none is
 	// specified the registry is used.
 	// Default = NULL;
-	const char* p_extra_ips;
+	PROCESSINGNDILIB_DEPRECATED const char* p_extra_ips;
 
 #if NDILIB_CPP_DEFAULT_CONSTRUCTORS
 	NDIlib_find_create_t(
