@@ -73,7 +73,7 @@ void NDIAudioTread()
 			if (url == pSources[i].p_url_address) 
 			{
 				NDIRecvCreateDesc.source_to_connect_to = pSources[i];
-				std::print("You are now connecting to {},IP :{}", pSources[i].p_ndi_name,pSources[i].p_url_address);
+				std::print("You are now connecting to {},IP :{}\n", pSources[i].p_ndi_name,pSources[i].p_url_address);
 				found = true;
 				break;
 			}
