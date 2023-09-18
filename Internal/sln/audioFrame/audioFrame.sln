@@ -9,6 +9,8 @@ Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "audioFrameTest", "..\audioF
 EndProject
 Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "NDI with audioFrame", "..\NDI with audioFrame\NDI with audioFrame.vcxproj", "{A9DF3429-E7DE-4C64-A8C4-1603FD550357}"
 EndProject
+Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "sndfileModule", "..\sndfileModule\sndfileModule.vcxproj", "{D83D91BE-F6B6-4553-91E6-927F50538168}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|x64 = Debug|x64
@@ -36,6 +38,14 @@ Global
 		{A9DF3429-E7DE-4C64-A8C4-1603FD550357}.Release|x64.Build.0 = Release|x64
 		{A9DF3429-E7DE-4C64-A8C4-1603FD550357}.Release|x86.ActiveCfg = Release|Win32
 		{A9DF3429-E7DE-4C64-A8C4-1603FD550357}.Release|x86.Build.0 = Release|Win32
+		{D83D91BE-F6B6-4553-91E6-927F50538168}.Debug|x64.ActiveCfg = Debug|x64
+		{D83D91BE-F6B6-4553-91E6-927F50538168}.Debug|x64.Build.0 = Debug|x64
+		{D83D91BE-F6B6-4553-91E6-927F50538168}.Debug|x86.ActiveCfg = Debug|Win32
+		{D83D91BE-F6B6-4553-91E6-927F50538168}.Debug|x86.Build.0 = Debug|Win32
+		{D83D91BE-F6B6-4553-91E6-927F50538168}.Release|x64.ActiveCfg = Release|x64
+		{D83D91BE-F6B6-4553-91E6-927F50538168}.Release|x64.Build.0 = Release|x64
+		{D83D91BE-F6B6-4553-91E6-927F50538168}.Release|x86.ActiveCfg = Release|Win32
+		{D83D91BE-F6B6-4553-91E6-927F50538168}.Release|x86.Build.0 = Release|Win32
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE

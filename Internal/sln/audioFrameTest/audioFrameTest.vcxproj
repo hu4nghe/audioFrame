@@ -59,7 +59,7 @@
     <Link>
       <SubSystem>Console</SubSystem>
       <GenerateDebugInformation>true</GenerateDebugInformation>
-      <AdditionalDependencies>C:\Users\Modulo\Desktop\WorkSpace\Internal\lib\audioFrame.lib;C:\Users\Modulo\Desktop\WorkSpace\External\lib\portaudio_x64.lib;C:\Users\Modulo\Desktop\WorkSpace\External\lib\sndfile.lib;C:\Users\Modulo\Desktop\WorkSpace\External\lib\samplerate.lib;C:\Users\Modulo\Desktop\WorkSpace\External\lib\Processing.NDI.Lib.x64.lib</AdditionalDependencies>
+      <AdditionalDependencies>C:\Users\Modulo\source\repos\audioFrame\Internal\lib\audioFrame.lib;C:\Users\Modulo\source\repos\audioFrame\External\lib\portaudio_x64.lib;C:\Users\Modulo\source\repos\audioFrame\External\lib\sndfile.lib;C:\Users\Modulo\source\repos\audioFrame\External\lib\samplerate.lib;C:\Users\Modulo\source\repos\audioFrame\External\lib\Processing.NDI.Lib.x64.lib</AdditionalDependencies>
       <AdditionalLibraryDirectories>C:\Users\Modulo\Desktop\WorkSpace\Internal\lib;%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
       <LinkTimeCodeGeneration>Default</LinkTimeCodeGeneration>
     </Link>
@@ -81,6 +81,7 @@
     </Link>
   </ItemDefinitionGroup>
   <ItemGroup>
+    <ClCompile Include="..\..\..\..\..\..\Desktop\Nouveau dossier\ModuloPi\audio\test\sndfile_test.cpp" />
     <ClCompile Include="..\..\src\audioFrameTest.cpp" />
     <ClCompile Include="functionsNotInUse.cpp" />
   </ItemGroup>

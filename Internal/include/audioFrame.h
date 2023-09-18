@@ -3,11 +3,15 @@
 
 #include <atomic>
 #include <concepts>
+#include <filesystem>
 #include <print>
 #include <thread>
 #include <vector>
 
 #include "samplerate.h"
+#include "sndfile.hh"
+
+namespace fs = std::filesystem;
 
 template<typename T>
 concept audioType = std::same_as<T, short> || std::same_as<T, float>;
@@ -34,6 +38,9 @@ class audioQueue
     public : //Public member functions
                              audioQueue         () = default;
                              audioQueue         (const  std:: size_t    initialCapacity);
+                             audioQueue         (const  std::size_t sampleRate,
+                                                 const  std::size_t channelNumbers,
+                                                 const  std::size_t frames);
 
                        void  push               (                 T*  &&ptr, 
                                                  const  std:: size_t    frames,
@@ -41,7 +48,7 @@ class audioQueue
                                                  const  std:: size_t    outputSampleRate);      
                        void  pop                (                 T*   &ptr, 
                                                  const  std:: size_t    frames,
-                                                 const          bool    mode);                
+                                                 const          bool    mode);
 
     inline             void  setSampleRate      (const  std:: size_t    sRate){ audioSampleRate = sRate; }
     inline             void  setChannelNum      (const  std:: size_t    cNum ){ channelNum = cNum; }
@@ -55,6 +62,7 @@ class audioQueue
     inline      std::size_t  channels           () const { return channelNum; }
     inline      std::size_t  sampleRate         () const { return audioSampleRate; }
     inline      std::size_t  size               () const { return elementCount.load(); }
+                       void  sndfileRead        (const      fs::path    file);
                
     private : //Private member functions
                        bool  enqueue            (const             T    value);
@@ -65,8 +73,9 @@ class audioQueue
                        void  resample           (      std::vector<T>  &data,
                                                  const std::  size_t    frames,
                                                  const std::  size_t    targetSampleRate);
-                       void channelConversion   (      std::vector<T>  &data,
+                       void  channelConversion  (      std::vector<T>  &data,
                                                  const std::  size_t    targetChannelNum);
+                       
 };
 
 #pragma region Constructors
@@ -74,6 +83,11 @@ template<audioType T>
 inline audioQueue<T>::audioQueue(const std::size_t initialCapacity)
     :   queue(initialCapacity+1), head(0), tail(0),usage(0), audioSampleRate(44100), channelNum(1), 
     elementCount(0), lowerThreshold(0), upperThreshold(100), inputDelay(45), outputDelay(15) {}
+
+template<audioType T>
+inline audioQueue<T>::audioQueue(const std::size_t sampleRate, const std::size_t channelNumbers, const std::size_t frames)
+    :   queue(frames * channelNumbers),audioSampleRate(sampleRate), channelNum(channelNumbers),
+    head(0), tail(0), usage(0), elementCount(0), lowerThreshold(0), upperThreshold(100), inputDelay(45), outputDelay(15) {}
 #pragma endregion
 
 #pragma region Private member functions
@@ -86,8 +100,9 @@ bool audioQueue<T>::enqueue(const T value)
     if (nextTail == head.load(std::memory_order_acquire)) return false; // Queue is full
 
     queue[currentTail] = value;
-    tail.store(nextTail, std::memory_order_release);
-    elementCount.fetch_add(1, std::memory_order_relaxed);
+    
+    tail        .store      (nextTail, std::memory_order_release);
+    elementCount.fetch_add  (       1, std::memory_order_relaxed);
 
     return true;
 }
@@ -99,10 +114,11 @@ bool audioQueue<T>::dequeue(T& value, const bool mode)
 
     if (currentHead == tail.load(std::memory_order_acquire)) return false; // Queue is empty
 
-    if (!mode) value = queue[currentHead];
-    else value += queue[currentHead];
-    head.store((currentHead + 1) % queue.size(), std::memory_order_release);
-    elementCount.fetch_sub(1, std::memory_order_relaxed);
+    if (!mode)  value =  queue[currentHead];
+    else        value += queue[currentHead];
+
+    head        .store      ((currentHead + 1) % queue.size(), std::memory_order_release);
+    elementCount.fetch_sub  (                               1, std::memory_order_relaxed);
 
     return true;
 }
@@ -122,7 +138,7 @@ template<audioType T>
 void audioQueue<T>::resample(std::vector<T>& data, const std::size_t frames, const std::size_t targetSampleRate)
 {
     const auto resampleRatio = static_cast<double>(targetSampleRate) / static_cast<double>(audioSampleRate);
-    const auto newSize       = static_cast<size_t>(static_cast<double>(frames) * static_cast<double>(channelNum) * resampleRatio);//previous frames number * channel number * ratio
+    const auto newSize       = static_cast<size_t>(frames * channelNum * resampleRatio);//previous frames number * channel number * ratio
     std::vector<T> temp(newSize);
 
     SRC_STATE* srcState = src_new(SRC_SINC_BEST_QUALITY, channelNum, nullptr);
@@ -168,15 +184,30 @@ void audioQueue<T>::channelConversion(std::vector<T>& data, const std::size_t ta
                 else
                 {
                     data.erase(iter);
-                    goto convertEnd;
+                    goto convertLoopEnd;
                 }
             }
         }
     }
-
-
-convertEnd:
+convertLoopEnd:
     channelNum = targetChannelNum;
+}
+
+template<audioType T>
+inline void audioQueue<T>::sndfileRead(const fs::path file)
+{
+    SndfileHandle soundFile(file.string(), SFM_READ);
+    audioSampleRate = soundFile.samplerate();
+    channelNum = soundFile.channels();
+    this->setCapacity(soundFile.frames() * channelNum);
+
+    float* temp = new float[soundFile.frames() * channelNum];
+    auto frameGen = soundFile.read(temp, soundFile.frames()* channelNum);
+    std::print("frame gen : {}, theorique : {}\n", frameGen, soundFile.frames());
+
+    this->push(std::move(temp), soundFile.frames(), audioSampleRate, channelNum);
+
+    return;
 }
 
 #pragma endregion
@@ -185,35 +216,33 @@ convertEnd:
 template<audioType T>
 void audioQueue<T>::push(T*&& ptr, std::size_t frames, const std::size_t outputChannelNum, const std::size_t outputSampleRate)
 {   
-    /*
     const bool needChannelConversion = (outputChannelNum != channelNum);
-    */
     const auto needResample          = (outputSampleRate != audioSampleRate); 
     const auto currentSize           = frames * channelNum;
     
     std::vector<T> temp;
-    std::move(ptr, ptr + currentSize, std::back_inserter(temp));
+    temp.reserve(currentSize);
+    std::print("currentSize = {},\nframes = {}\n", currentSize, frames);
+    std::move(std::make_move_iterator(ptr), std::make_move_iterator(ptr + currentSize), std::back_inserter(temp));
     /*
     if (needChannelConversion)
-    {
-        channelConversion(temp, outputChannelNum);
-    }*/
+        channelConversion(temp, outputChannelNum);*/
     if (needResample)
-    {
         resample(temp, frames, outputSampleRate);
-    }
     
-    const auto finalSize = temp.size();
-    const auto estimatedUsage = usage.load() + (finalSize * 100 / queue.size());
+    const auto estimatedUsage = usage.load() + (temp.size() * 100 / queue.size());
 
-    if (estimatedUsage >= upperThreshold) std::this_thread::sleep_for(std::chrono::milliseconds(inputDelay));
-    for (auto i = 0; i < finalSize; i++)
+    if (estimatedUsage >= upperThreshold) 
+        std::this_thread::sleep_for(std::chrono::milliseconds(inputDelay));
+
+    for (auto i : temp)
     {
-        if (!(this->enqueue(temp[i])))
+        if (!this->enqueue(i))
         {
-            std::print("Warning : push operation aborted, {} elements are pushed.\n",i+1);
+            std::print("Warning : push operation aborted, no enough space.\n");
             break;
         }
+        else std::print("pushed value : {}\n",i);
     }
     usageRefresh();
 }

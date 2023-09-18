@@ -21,5 +21,8 @@
     <ClCompile Include="..\..\src\audioFrameTest.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
+    <ClCompile Include="..\..\..\..\..\..\Desktop\Nouveau dossier\ModuloPi\audio\test\sndfile_test.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
   </ItemGroup>
 </Project>

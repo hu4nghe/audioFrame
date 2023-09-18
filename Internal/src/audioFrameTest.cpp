@@ -1,59 +1,17 @@
-﻿#include <iostream>
-#include <list>
+﻿/*
 #include <print>
-#include <vector>
 #include "audioFrame.h"
-
-audioQueue<float> queue(9);
-audioQueue<float> out(9);
-
-void thread1()
-{
-	std::vector<float> b{ 9,8,7,6,5,4,3,2,1 };
-	queue.push(b.data(),b.size(), 2, 44100);
-
-}
-void thread2()
-{
-	float* ptr = new float[9];
-	queue.pop(ptr, queue.size(), false);
-	std::this_thread::sleep_for(std::chrono::seconds(1));
-	for (int i = 0; i < 9; i++)
-	{
-		std::print("{}\n", ptr[i]);
-	}
-
-	out.push(std::move(ptr), queue.size(), 2, 44100);
-
-	float* ptr1 = new float[9];
-	out.pop(ptr1, out.size(), false);
-
-	for (int i = 0; i < 9; i++)
-	{
-		std::print("{}\n", ptr1[i]);
-	}
-
-	delete[] ptr1;
-}
-
+#include "sndfile.hh"
 
 int main() 
 {
-	std::thread ndiThread(thread1);
-	std::vector<float> a{ 1,2,3,4,5,6,7,8,9 };
-	
-	queue.push(a.data(), a.size(), 2, 44100);
-	std::thread portaudio(thread2);
 
-
-	ndiThread.detach();
-	portaudio.join();
-	return 0;
 }
 
 
 
 
+*/
 
 
 
@@ -75,10 +33,16 @@ int main()
 
 
 
+/*
 
+	std::print("start\n");
+	
+	audioQueue<float> a;
+	audioQueue<float> b;
 
-
-
+	a.sndfileRead("C:/Users/Modulo/Desktop/Nouveau dossier/Music/Rachmaninov- Music For 2 Pianos, Vladimir Ashekenazy & André Previn/Rachmaninov- Music For 2 Pianos [Disc 1]/Rachmaninov- Suite #1 For 2 Pianos, Op. 5, 'Fantaisie-Tableaux' - 1. Bacarolle- Allegretto.wav");
+	return 0;
+	*/
 
 
 

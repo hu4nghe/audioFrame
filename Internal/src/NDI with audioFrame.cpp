@@ -26,6 +26,7 @@ constexpr auto PA_BUFFER_SIZE				= 128;
 constexpr auto NDI_TIMEOUT					= 1000;
 constexpr auto QUEUE_SIZE_MULTIPLIER		= 200;
 audioQueue<float> NDIdata(0);
+audioQueue<float> SNDdata(0);
 #pragma endregion
 
 /**
@@ -42,6 +43,7 @@ inline void  PAErrorCheck (PaError err){if ( err){ std::print("PortAudio error :
 #pragma region NDI IO
 void NDIAudioTread()
 {
+	NDIlib_initialize();
 	std::signal(SIGINT, sigIntHandler);
 
 	#pragma region NDI Initialization
@@ -173,15 +175,39 @@ void portAudioOutputThread()
 }
 #pragma endregion
 
+void sndfileRead()
+{
+	SndfileHandle sndFile("C:/Users/Modulo/Desktop/Nouveau dossier/Music/Rachmaninov- Music For 2 Pianos, Vladimir Ashekenazy & André Previn/Rachmaninov- Music For 2 Pianos [Disc 1]/Rachmaninov- Suite #1 For 2 Pianos, Op. 5, 'Fantaisie-Tableaux' - 1. Bacarolle- Allegretto.wav");
+	
+	const size_t bufferSize = 2048 * sndFile.channels();
+	SNDdata.setCapacity(bufferSize);
+	SNDdata.setChannelNum(sndFile.channels());
+	SNDdata.setSampleRate(sndFile.samplerate());
+
+	while (!exit_loop)
+	{
+		float* temp = new float[bufferSize];
+		sndFile.read(temp, bufferSize);
+		for (int i = 0; i < bufferSize; i++)
+		{
+			std::print("{}\n", temp[i]);
+		}
+		//SNDdata.push(std::move(temp), sndFile.frames(), 2,44100);
+	}
+	return;
+}
 int main()
 {
-	NDIlib_initialize();
+	
 	PAErrorCheck(Pa_Initialize());
 	std::thread ndiThread(NDIAudioTread);
+	std::thread sndfile(sndfileRead);
 	std::thread portaudio(portAudioOutputThread);
+	
 
 
 	ndiThread.detach();
+	sndfile.detach();
 	portaudio.join();
 	PAErrorCheck(Pa_Terminate());
 	return 0;
