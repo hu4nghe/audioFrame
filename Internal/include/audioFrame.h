@@ -38,32 +38,32 @@ class audioQueue
     public : //Public member functions
                              audioQueue         () = default;
                              audioQueue         (const  std:: size_t    initialCapacity);
-                             audioQueue         (const  std::size_t sampleRate,
-                                                 const  std::size_t channelNumbers,
-                                                 const  std::size_t frames);
+                             audioQueue         (const  std:: size_t    sampleRate,
+                                                 const  std:: size_t    channelNumbers,
+                                                 const  std:: size_t    frames);
 
-                       void  push               (                 T*  &&ptr, 
+                       bool  push               (                 T*  &&ptr, 
                                                  const  std:: size_t    frames,
                                                  const  std:: size_t    outputChannelNum,
                                                  const  std:: size_t    outputSampleRate);      
-                       void  pop                (                 T*   &ptr, 
+                       bool  pop                (                 T*   &ptr, 
                                                  const  std:: size_t    frames,
                                                  const          bool    mode);
 
-    inline             void  setSampleRate      (const  std:: size_t    sRate){ audioSampleRate = sRate; }
-    inline             void  setChannelNum      (const  std:: size_t    cNum ){ channelNum = cNum; }
+    inline             void  setSampleRate      (const  std:: size_t    sRate)                      { audioSampleRate = sRate; }
+    inline             void  setChannelNum      (const  std:: size_t    cNum )                      { channelNum = cNum; }
                        void  setCapacity        (const  std:: size_t    newCapacity);
 //                     void  setVolume          (const  std::uint8_t    volume);
                        void  setDelay           (const  std::uint8_t    lower,
                                                  const  std::uint8_t    upper,
-                                                 const  std:: size_t    iDelay,
-                                                 const  std:: size_t    oDelay);
+                                                 const  std:: size_t    inputDelay,
+                                                 const  std:: size_t    outputDelay);
                
-    inline      std::size_t  channels           () const { return channelNum; }
-    inline      std::size_t  sampleRate         () const { return audioSampleRate; }
-    inline      std::size_t  size               () const { return elementCount.load(); }
-                       void  sndfileRead        (const      fs::path    file);
-               
+    inline      std::size_t  channels           ()                                          const   { return channelNum; }
+    inline      std::size_t  sampleRate         ()                                          const   { return audioSampleRate; }
+    inline      std::size_t  size               ()                                          const   { return elementCount.load(); }
+    inline             bool  ready              ()                                          const   { return usage.load() != 0; }  
+
     private : //Private member functions
                        bool  enqueue            (const             T    value);
                        bool  dequeue            (                  T   &value,
@@ -192,29 +192,11 @@ void audioQueue<T>::channelConversion(std::vector<T>& data, const std::size_t ta
 convertLoopEnd:
     channelNum = targetChannelNum;
 }
-
-template<audioType T>
-inline void audioQueue<T>::sndfileRead(const fs::path file)
-{
-    SndfileHandle soundFile(file.string(), SFM_READ);
-    audioSampleRate = soundFile.samplerate();
-    channelNum = soundFile.channels();
-    this->setCapacity(soundFile.frames() * channelNum);
-
-    float* temp = new float[soundFile.frames() * channelNum];
-    auto frameGen = soundFile.read(temp, soundFile.frames()* channelNum);
-    std::print("frame gen : {}, theorique : {}\n", frameGen, soundFile.frames());
-
-    this->push(std::move(temp), soundFile.frames(), audioSampleRate, channelNum);
-
-    return;
-}
-
 #pragma endregion
 
 #pragma region Public APIs
 template<audioType T>
-void audioQueue<T>::push(T*&& ptr, std::size_t frames, const std::size_t outputChannelNum, const std::size_t outputSampleRate)
+bool audioQueue<T>::push(T*&& ptr, std::size_t frames, const std::size_t outputChannelNum, const std::size_t outputSampleRate)
 {   
     const bool needChannelConversion = (outputChannelNum != channelNum);
     const auto needResample          = (outputSampleRate != audioSampleRate); 
@@ -222,8 +204,7 @@ void audioQueue<T>::push(T*&& ptr, std::size_t frames, const std::size_t outputC
     
     std::vector<T> temp;
     temp.reserve(currentSize);
-    std::print("currentSize = {},\nframes = {}\n", currentSize, frames);
-    std::move(std::make_move_iterator(ptr), std::make_move_iterator(ptr + currentSize), std::back_inserter(temp));
+    std::move(ptr, ptr + currentSize, std::back_inserter(temp));
     /*
     if (needChannelConversion)
         channelConversion(temp, outputChannelNum);*/
@@ -233,22 +214,27 @@ void audioQueue<T>::push(T*&& ptr, std::size_t frames, const std::size_t outputC
     const auto estimatedUsage = usage.load() + (temp.size() * 100 / queue.size());
 
     if (estimatedUsage >= upperThreshold) 
+    {
+        std::print("input delay called\n");
         std::this_thread::sleep_for(std::chrono::milliseconds(inputDelay));
+        
+    }
 
     for (auto i : temp)
     {
         if (!this->enqueue(i))
         {
             std::print("Warning : push operation aborted, no enough space.\n");
-            break;
+            usageRefresh();
+            return false;
         }
-        else std::print("pushed value : {}\n",i);
     }
     usageRefresh();
+    return true;
 }
 
 template<audioType T>
-void audioQueue<T>::pop(T*& ptr, std::size_t frames,const bool mode)
+bool audioQueue<T>::pop(T*& ptr, std::size_t frames,const bool mode)
 {   
     const auto size = frames * channelNum;
     const auto estimatedUsage = usage.load() >= (size * 100 / queue.size()) ? usage.load() - (size * 100 / queue.size()) : 0;
@@ -259,10 +245,12 @@ void audioQueue<T>::pop(T*& ptr, std::size_t frames,const bool mode)
        if (!this->dequeue(ptr[i],mode)) 
        {
            std::print("Warning : there is only {} elements were poped, {} demanded.\n", i, size);
-           break;
+           usageRefresh();
+           return false;
        }
     }
     usageRefresh();
+    return true;
 }
 
 template<audioType T>
@@ -277,15 +265,15 @@ inline void audioQueue<T>::setCapacity(std::size_t newCapacity)
 }
 
 template<audioType T>
-inline void audioQueue<T>::setDelay(const std::uint8_t lower, const std::uint8_t upper, const std::size_t iDelay, const std::size_t oDelay)
+inline void audioQueue<T>::setDelay(const std::uint8_t lower, const std::uint8_t upper, const std::size_t inputDelay, const std::size_t outputDelay)
 {
     auto isInRange = [](const std::uint8_t val) { return val >= 0 && val <= 100; };
     if (isInRange(lowerThreshold) && isInRange(upperThreshold))
     {
         lowerThreshold = lower;
         upperThreshold = upper;
-        inputDelay     = iDelay;
-        outputDelay    = oDelay;
+        inputDelay     = inputDelay;
+        outputDelay    = outputDelay;
     }
     else std::print("The upper and lower threshold must between 0% and 100% ! Threshold not set. ");
 }

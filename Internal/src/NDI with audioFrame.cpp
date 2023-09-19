@@ -5,48 +5,46 @@
 #include "audioFrame.h"
 #include <print>
 
+#pragma region System signal handler
 /**
  * @brief A system signal handler allows to quit with Crtl + C
  * 
  * Let exit_loop = true if a system signal is received.
  */
-#pragma region Signal handler
 static std::atomic<bool> exit_loop(false);
 static void sigIntHandler(int) {exit_loop = true;}
 #pragma endregion
 
-/**
- * @brief Global variables definition
- * 
- * Constants and data queue.
- */
-#pragma region Global definition
-constexpr auto SAMPLE_RATE					= 44100;
+#pragma region Global constants and variables
+constexpr auto SAMPLE_RATE					= 48000;
 constexpr auto PA_BUFFER_SIZE				= 128;
 constexpr auto NDI_TIMEOUT					= 1000;
-constexpr auto QUEUE_SIZE_MULTIPLIER		= 200;
+constexpr auto QUEUE_SIZE_MULTIPLIER		= 100;
+
+std::atomic<bool> NDIReady(false);
 audioQueue<float> NDIdata(0);
 audioQueue<float> SNDdata(0);
+audioQueue<float> MICdata(0);
 #pragma endregion
 
+#pragma region Error Handlers
 /**
  * @brief Error checker for NDI and PortAudio library.
  * 
  * Exit with failure in case of error.
  */
-#pragma region Error Handlers
 template <typename T>
 inline T*	NDIErrorCheck (T*	   ptr){if (!ptr){ std::print("NDI Error: No source is found.\n"); exit(EXIT_FAILURE); } else{ return ptr; }}
 inline void  PAErrorCheck (PaError err){if ( err){ std::print("PortAudio error : {}.\n", Pa_GetErrorText(err)); exit(EXIT_FAILURE);}}
 #pragma endregion
 
-#pragma region NDI IO
+#pragma region NDI Inout
 void NDIAudioTread()
 {
 	NDIlib_initialize();
 	std::signal(SIGINT, sigIntHandler);
 
-	#pragma region NDI Initialization
+	#pragma region NDI source search
 	// Create a NDI finder and try to find a source NDI 
 	const NDIlib_find_create_t NDIFindCreateDesc;
 	auto pNDIFind = NDIErrorCheck(NDIlib_find_create_v2(&NDIFindCreateDesc)); 
@@ -58,15 +56,14 @@ void NDIAudioTread()
 		pSources = NDIlib_find_get_current_sources(pNDIFind, &numSources);
 	}
 	NDIErrorCheck(pSources);
-	
+	std::print("NDI sources :\n");
 	for (int i = 0; i < numSources; i++)
 		std::print("Source {}\nName : {}\nIP   : {}\n\n", i , pSources[i].p_ndi_name, pSources[i].p_url_address);
 
-	std::print("Please enter the URL of the source that you want to connect to.\n");
+	std::print("Please enter the IP of the source that you want to connect to.\n");
 
 	NDIlib_recv_create_v3_t NDIRecvCreateDesc;
 	std::string url;
-	bool found = false;
 	do 
 	{
 		std::cin >> url;
@@ -76,12 +73,12 @@ void NDIAudioTread()
 			{
 				NDIRecvCreateDesc.source_to_connect_to = pSources[i];
 				std::print("You are now connecting to {},IP :{}\n", pSources[i].p_ndi_name,pSources[i].p_url_address);
-				found = true;
+				NDIReady.store(true);
 				break;
 			}
 		}
-		if (!found) std::print("No source matched! Please try again.\n");
-	} while (!found);
+		if (!NDIReady.load()) std::print("No source matched! Please try again.\n");
+	} while (!NDIReady.load());
 	
 	
 	std::string name=NDIRecvCreateDesc.source_to_connect_to.p_ndi_name;
@@ -89,7 +86,6 @@ void NDIAudioTread()
 	NDIRecvCreateDesc.p_ndi_recv_name = name.c_str();
 
 	auto pNDI_recv = NDIErrorCheck(NDIlib_recv_create_v3(&NDIRecvCreateDesc));
-	std::print("playing...\n");
 	NDIlib_find_destroy(pNDIFind);
 	#pragma endregion
 	
@@ -126,18 +122,57 @@ void NDIAudioTread()
 	NDIlib_destroy();
 	#pragma endregion
 }
+#pragma endregion
 
-static int portAudioOutputCallback(const void*					   inputBuffer, 
-										 void*					   outputBuffer,
-										 unsigned long             framesPerBuffer,
-								   const PaStreamCallbackTimeInfo* timeInfo,
-										 PaStreamCallbackFlags	   statusFlags,
-										 void*					   UserData)
+#pragma region Sndfile Input
+void sndfileRead()
+{
+	/*
+	std::string filePathStr;
+	while (true)
+	{
+		if(NDIReady.load())
+		{ 
+			std::print("Sndfile: Please enter the path of the sound file: ");
+			std::getline(std::cin >> std::ws, filePathStr);
+			break;
+		}
+	}*/
+
+	SndfileHandle sndFile("C:/Users/Modulo/Desktop/Nouveau dossier/Music/Rachmaninov- Music For 2 Pianos, Vladimir Ashekenazy & André Previn/Rachmaninov- Music For 2 Pianos [Disc 1]/Rachmaninov- Suite #1 For 2 Pianos, Op. 5, 'Fantaisie-Tableaux' - 1. Bacarolle- Allegretto.wav");
+	const size_t bufferSize = sndFile.frames() * sndFile.channels() + 100;
+
+	float* temp = new float[bufferSize];
+
+	SNDdata.setCapacity(bufferSize);
+	SNDdata.setChannelNum(sndFile.channels());
+	SNDdata.setSampleRate(sndFile.samplerate());
+
+	sndFile.read(temp, bufferSize);
+	SNDdata.push(std::move(temp), sndFile.frames(), 2,SAMPLE_RATE);
+	std::print("read file all done");
+	return;
+}
+#pragma endregion
+
+
+#pragma region PA output
+static int portAudioOutputCallback(	const					  void*	inputBuffer,
+															  void*	outputBuffer,
+													 unsigned long	framesPerBuffer,
+									const PaStreamCallbackTimeInfo*	timeInfo,
+											 PaStreamCallbackFlags	statusFlags,
+															  void*	UserData)
 {
 	auto out = static_cast<float*>(outputBuffer);
-	NDIdata.pop(out, framesPerBuffer, false);
+	memset(out, 0, sizeof(out) * framesPerBuffer);
+	if (SNDdata.ready()) SNDdata.pop(out, framesPerBuffer, true);
+	if (NDIdata.ready()) NDIdata.pop(out, framesPerBuffer, true);
+	if (MICdata.ready())	MICdata.pop(out, framesPerBuffer, true);
 	return paContinue;
 }
+
+
 
 void portAudioOutputThread()
 {
@@ -146,65 +181,37 @@ void portAudioOutputThread()
 #pragma region PA Initialization
 
 	PaStream* streamOut;
-	PAErrorCheck(Pa_OpenDefaultStream	(&streamOut,					// PaStream ptr
-										 0,								// Input  channels
-										 2,								// Output channels
-										 paFloat32,						// Sample format
-									     SAMPLE_RATE,					// Sample rate
-										 PA_BUFFER_SIZE,				// 128
-										 portAudioOutputCallback,		// Callback function called
-										 nullptr));						// No user NDIdata passed
-	PAErrorCheck(Pa_StartStream			(streamOut));
+	PAErrorCheck(Pa_OpenDefaultStream( &streamOut,					// PaStream ptr
+										0,								// Input  channels
+										2,								// Output channels
+										paFloat32,						// Sample format
+										SAMPLE_RATE,					// Sample rate
+										PA_BUFFER_SIZE,					// 128
+										portAudioOutputCallback,		// Callback function called
+										nullptr));						// No user NDIdata passed
+
+										PAErrorCheck(Pa_StartStream(streamOut));
 #pragma endregion
 
 #pragma region PA Callback playing loop
 
-	while (!exit_loop)
-	{
-		if (!NDIdata.size()) Pa_AbortStream(streamOut);
-		if (NDIdata.size() && Pa_IsStreamStopped(streamOut)) Pa_StartStream(streamOut);
-	}
+	while (!exit_loop){}
 #pragma endregion
 
 #pragma region PA Clean up
 
-	PAErrorCheck(Pa_StopStream	(streamOut));
-	PAErrorCheck(Pa_CloseStream	(streamOut));
-	
+	PAErrorCheck(Pa_StopStream(streamOut));
+	PAErrorCheck(Pa_CloseStream(streamOut));
+
 #pragma endregion
 }
 #pragma endregion
-
-void sndfileRead()
-{
-	SndfileHandle sndFile("C:/Users/Modulo/Desktop/Nouveau dossier/Music/Rachmaninov- Music For 2 Pianos, Vladimir Ashekenazy & André Previn/Rachmaninov- Music For 2 Pianos [Disc 1]/Rachmaninov- Suite #1 For 2 Pianos, Op. 5, 'Fantaisie-Tableaux' - 1. Bacarolle- Allegretto.wav");
-	
-	const size_t bufferSize = 2048 * sndFile.channels();
-	SNDdata.setCapacity(bufferSize);
-	SNDdata.setChannelNum(sndFile.channels());
-	SNDdata.setSampleRate(sndFile.samplerate());
-
-	while (!exit_loop)
-	{
-		float* temp = new float[bufferSize];
-		sndFile.read(temp, bufferSize);
-		for (int i = 0; i < bufferSize; i++)
-		{
-			std::print("{}\n", temp[i]);
-		}
-		//SNDdata.push(std::move(temp), sndFile.frames(), 2,44100);
-	}
-	return;
-}
 int main()
 {
-	
 	PAErrorCheck(Pa_Initialize());
 	std::thread ndiThread(NDIAudioTread);
 	std::thread sndfile(sndfileRead);
 	std::thread portaudio(portAudioOutputThread);
-	
-
 
 	ndiThread.detach();
 	sndfile.detach();
