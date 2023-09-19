@@ -36,13 +36,12 @@ class audioQueue
    std::atomic<std::uint8_t> usage;
 
     public : //Public member functions
-                             audioQueue         () = default;
-                             audioQueue         (const  std:: size_t    initialCapacity);
+                             audioQueue         ();
                              audioQueue         (const  std:: size_t    sampleRate,
                                                  const  std:: size_t    channelNumbers,
                                                  const  std:: size_t    frames);
 
-                       bool  push               (                 T*  &&ptr, 
+                       bool  push               (                 T*   &ptr, 
                                                  const  std:: size_t    frames,
                                                  const  std:: size_t    outputChannelNum,
                                                  const  std:: size_t    outputSampleRate);      
@@ -80,9 +79,9 @@ class audioQueue
 
 #pragma region Constructors
 template<audioType T>
-inline audioQueue<T>::audioQueue(const std::size_t initialCapacity)
-    :   queue(initialCapacity+1), head(0), tail(0),usage(0), audioSampleRate(44100), channelNum(1), 
-    elementCount(0), lowerThreshold(0), upperThreshold(100), inputDelay(45), outputDelay(15) {}
+inline audioQueue<T>::audioQueue()
+    :   queue(0), head(0), tail(0), usage(0), audioSampleRate(0), channelNum(0),
+    elementCount(0), lowerThreshold(0), upperThreshold(0), inputDelay(0), outputDelay(0) {}
 
 template<audioType T>
 inline audioQueue<T>::audioQueue(const std::size_t sampleRate, const std::size_t channelNumbers, const std::size_t frames)
@@ -94,8 +93,8 @@ inline audioQueue<T>::audioQueue(const std::size_t sampleRate, const std::size_t
 template<audioType T>
 bool audioQueue<T>::enqueue(const T value)
 {
-    std::size_t currentTail = tail.load(std::memory_order_relaxed);
-    std::size_t    nextTail = (currentTail + 1) % queue.size();
+    auto currentTail = tail.load(std::memory_order_relaxed);
+    auto    nextTail = (currentTail + 1) % queue.size();
 
     if (nextTail == head.load(std::memory_order_acquire)) return false; // Queue is full
 
@@ -110,12 +109,12 @@ bool audioQueue<T>::enqueue(const T value)
 template<audioType T>
 bool audioQueue<T>::dequeue(T& value, const bool mode)
 {
-    std::size_t currentHead = head.load(std::memory_order_relaxed);
+    auto currentHead =  head.load(std::memory_order_relaxed);
 
-    if (currentHead == tail.load(std::memory_order_acquire)) return false; // Queue is empty
+    if ( currentHead == tail.load(std::memory_order_acquire)) return false; // Queue is empty
 
-    if (!mode)  value =  queue[currentHead];
-    else        value += queue[currentHead];
+    if (!mode) value  = queue[currentHead];
+    else       value += queue[currentHead];
 
     head        .store      ((currentHead + 1) % queue.size(), std::memory_order_release);
     elementCount.fetch_sub  (                               1, std::memory_order_relaxed);
@@ -141,19 +140,19 @@ void audioQueue<T>::resample(std::vector<T>& data, const std::size_t frames, con
     const auto newSize       = static_cast<size_t>(frames * channelNum * resampleRatio);//previous frames number * channel number * ratio
     std::vector<T> temp(newSize);
 
-    SRC_STATE* srcState = src_new(SRC_SINC_BEST_QUALITY, channelNum, nullptr);
+    SRC_STATE* srcState = src_new(SRC_SINC_BEST_QUALITY, static_cast<int>(channelNum), nullptr);
 
     SRC_DATA srcData;
-    srcData.end_of_input    = true;
-    srcData.data_in         = data.data();
-    srcData.data_out        = temp.data();
-    srcData.input_frames    = frames;
-    srcData.output_frames   = static_cast<int>(frames * resampleRatio);
-    srcData.src_ratio       = resampleRatio;
+    srcData.end_of_input  = true;
+    srcData.data_in       = data.data();
+    srcData.data_out      = temp.data();
+    srcData.input_frames  = static_cast<long>(frames);
+    srcData.output_frames = static_cast<int >(frames * resampleRatio);
+    srcData.src_ratio     = resampleRatio;
 
     src_process(srcState, &srcData);
     src_delete(srcState);
-
+    
     data = std::move(temp);
     audioSampleRate = targetSampleRate;
 }
@@ -196,15 +195,13 @@ convertLoopEnd:
 
 #pragma region Public APIs
 template<audioType T>
-bool audioQueue<T>::push(T*&& ptr, std::size_t frames, const std::size_t outputChannelNum, const std::size_t outputSampleRate)
-{   
+bool audioQueue<T>::push(T*& ptr, std::size_t frames, const std::size_t outputChannelNum, const std::size_t outputSampleRate)
+{
     const bool needChannelConversion = (outputChannelNum != channelNum);
-    const auto needResample          = (outputSampleRate != audioSampleRate); 
-    const auto currentSize           = frames * channelNum;
-    
-    std::vector<T> temp;
-    temp.reserve(currentSize);
-    std::move(ptr, ptr + currentSize, std::back_inserter(temp));
+    const auto needResample = (outputSampleRate != audioSampleRate);
+    const auto currentSize = frames * channelNum;
+
+    std::vector<T> temp(ptr, ptr + currentSize);
     /*
     if (needChannelConversion)
         channelConversion(temp, outputChannelNum);*/
@@ -214,11 +211,7 @@ bool audioQueue<T>::push(T*&& ptr, std::size_t frames, const std::size_t outputC
     const auto estimatedUsage = usage.load() + (temp.size() * 100 / queue.size());
 
     if (estimatedUsage >= upperThreshold) 
-    {
-        std::print("input delay called\n");
         std::this_thread::sleep_for(std::chrono::milliseconds(inputDelay));
-        
-    }
 
     for (auto i : temp)
     {
@@ -270,10 +263,10 @@ inline void audioQueue<T>::setDelay(const std::uint8_t lower, const std::uint8_t
     auto isInRange = [](const std::uint8_t val) { return val >= 0 && val <= 100; };
     if (isInRange(lowerThreshold) && isInRange(upperThreshold))
     {
-        lowerThreshold = lower;
-        upperThreshold = upper;
-        inputDelay     = inputDelay;
-        outputDelay    = outputDelay;
+        lowerThreshold       = lower;
+        upperThreshold       = upper;
+        this->inputDelay     = inputDelay;
+        this->outputDelay    = outputDelay;
     }
     else std::print("The upper and lower threshold must between 0% and 100% ! Threshold not set. ");
 }

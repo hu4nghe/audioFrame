@@ -19,12 +19,11 @@ static void sigIntHandler(int) {exit_loop = true;}
 constexpr auto SAMPLE_RATE					= 48000;
 constexpr auto PA_BUFFER_SIZE				= 128;
 constexpr auto NDI_TIMEOUT					= 1000;
-constexpr auto QUEUE_SIZE_MULTIPLIER		= 100;
+constexpr auto QUEUE_SIZE_MULTIPLIER		= SAMPLE_RATE / 9600;
 
-std::atomic<bool> NDIReady(false);
-audioQueue<float> NDIdata(0);
-audioQueue<float> SNDdata(0);
-audioQueue<float> MICdata(0);
+audioQueue<float> NDIdata;
+audioQueue<float> SNDdata;
+audioQueue<float> MICdata;
 #pragma endregion
 
 #pragma region Error Handlers
@@ -56,31 +55,31 @@ void NDIAudioTread()
 		pSources = NDIlib_find_get_current_sources(pNDIFind, &numSources);
 	}
 	NDIErrorCheck(pSources);
-	std::print("NDI sources :\n");
-	for (int i = 0; i < numSources; i++)
+	std::print("NDI sources list:\n");
+	for (std::size_t i = 0; i < numSources; i++)
 		std::print("Source {}\nName : {}\nIP   : {}\n\n", i , pSources[i].p_ndi_name, pSources[i].p_url_address);
 
 	std::print("Please enter the IP of the source that you want to connect to.\n");
 
 	NDIlib_recv_create_v3_t NDIRecvCreateDesc;
+	bool NDIReady = false;
 	std::string url;
 	do 
 	{
 		std::cin >> url;
-		for (int i = 0; i < numSources; i++) 
+		for (std::size_t i = 0; i < numSources; i++) 
 		{
 			if (url == pSources[i].p_url_address) 
 			{
 				NDIRecvCreateDesc.source_to_connect_to = pSources[i];
-				std::print("You are now connecting to {},IP :{}\n", pSources[i].p_ndi_name,pSources[i].p_url_address);
-				NDIReady.store(true);
+				std::print("You are now connecting to {}.\n", pSources[i].p_ndi_name);
+				NDIReady = true ;
 				break;
 			}
 		}
-		if (!NDIReady.load()) std::print("No source matched! Please try again.\n");
-	} while (!NDIReady.load());
-	
-	
+		if (!NDIReady) std::print("No source matched! Please try again.\n");
+	} while (!NDIReady);
+
 	std::string name=NDIRecvCreateDesc.source_to_connect_to.p_ndi_name;
 	name += " Receiver";
 	NDIRecvCreateDesc.p_ndi_recv_name = name.c_str();
@@ -106,12 +105,12 @@ void NDIAudioTread()
 			NDIlib_util_audio_to_interleaved_32f_v2(&audioInput, &audioDataNDI);
 			NDIlib_recv_free_audio_v2(pNDI_recv, &audioInput);
 
-			if(audioDataNDI.no_channels != NDIdata.channels  ()) NDIdata.setChannelNum(audioDataNDI.no_channels);
-			if(audioDataNDI.sample_rate != NDIdata.sampleRate()) NDIdata.setSampleRate(audioDataNDI.sample_rate);
+			NDIdata.setChannelNum(audioDataNDI.no_channels);
+			NDIdata.setSampleRate(audioDataNDI.sample_rate);
 			NDIdata.setCapacity (static_cast<std::size_t>(dataSize * QUEUE_SIZE_MULTIPLIER));
+			NDIdata.push(audioDataNDI.p_data, audioDataNDI.no_samples,2,SAMPLE_RATE);
 
-			NDIdata.push(std::move(audioDataNDI.p_data), audioDataNDI.no_samples,2,SAMPLE_RATE);
-			//NDIlib_audio_frame_interleaved_32f_t.p_data's ownership is moved to audioQueue, no need to delete[] explicitly.
+			delete[] audioDataNDI.p_data;
 		}
 		
 	}
@@ -149,8 +148,9 @@ void sndfileRead()
 	SNDdata.setSampleRate(sndFile.samplerate());
 
 	sndFile.read(temp, bufferSize);
-	SNDdata.push(std::move(temp), sndFile.frames(), 2,SAMPLE_RATE);
-	std::print("read file all done");
+	SNDdata.push(temp, sndFile.frames(), 2,SAMPLE_RATE);
+	
+	delete[] temp;
 	return;
 }
 #pragma endregion
@@ -210,11 +210,11 @@ int main()
 {
 	PAErrorCheck(Pa_Initialize());
 	std::thread ndiThread(NDIAudioTread);
-	std::thread sndfile(sndfileRead);
+	//std::thread sndfile(sndfileRead);
 	std::thread portaudio(portAudioOutputThread);
 
 	ndiThread.detach();
-	sndfile.detach();
+	//sndfile.detach();
 	portaudio.join();
 	PAErrorCheck(Pa_Terminate());
 	return 0;
