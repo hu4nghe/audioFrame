@@ -132,7 +132,7 @@ inline void audioQueue<T>::clear()
 }
 
 template<audioType T>
-inline void audioQueue<T>::usageRefresh(){ usage.store(static_cast<std::uint8_t>(static_cast<double>(elementCount.load()) / queue.size() * 100.0)); }
+inline void audioQueue<T>::usageRefresh() { usage.store(static_cast<std::uint8_t>(static_cast<double>(elementCount.load()) / queue.size() * 100.0)); }
 
 template<audioType T>
 void audioQueue<T>::resample(std::vector<T>& data, const std::size_t frames, const std::size_t targetSampleRate)
