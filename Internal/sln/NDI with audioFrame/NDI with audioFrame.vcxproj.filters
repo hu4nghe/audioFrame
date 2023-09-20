@@ -19,7 +19,4 @@
       <Filter>Source Files</Filter>
     </ClCompile>
   </ItemGroup>
-  <ItemGroup>
-    <None Include="..\..\..\..\..\vcpkg\vcpkg\installed\x64-windows\bin\samplerate.dll" />
-  </ItemGroup>
 </Project>
